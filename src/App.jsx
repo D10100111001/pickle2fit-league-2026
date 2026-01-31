@@ -357,6 +357,7 @@ export default function App() {
   const [playerName, setPlayerName] = useState(null);
   const [imageError, setImageError] = useState(false);
   const [showAppInfo, setShowAppInfo] = useState(false);
+  const [matchesFilter, setMatchesFilter] = useState('all');
   const initialized = useRef(false);
 
   // --- Auth & Init ---
@@ -529,6 +530,14 @@ export default function App() {
     }
   };
 
+  const handleTabChange = (tab) => {
+    if (tab === 'matches') {
+      // Reset filter to 'all' when manually navigating to matches tab
+      setMatchesFilter('all');
+    }
+    setActiveTab(tab);
+  };
+
   const renderContent = () => {
     if (loading && matches.length === 0) {
       return (
@@ -540,11 +549,11 @@ export default function App() {
     }
 
     switch(activeTab) {
-      case 'dashboard': return <Dashboard standings={standings} matches={matches} teams={INITIAL_TEAMS} onMatchClick={setEditingMatch} />;
-      case 'matches': return <MatchSchedule matches={matches} updateMatch={updateMatch} teams={INITIAL_TEAMS} user={user} playerName={playerName} />;
+      case 'dashboard': return <Dashboard standings={standings} matches={matches} teams={INITIAL_TEAMS} onMatchClick={setEditingMatch} onViewAllMatches={() => { setMatchesFilter('completed'); setActiveTab('matches'); }} />;
+      case 'matches': return <MatchSchedule matches={matches} updateMatch={updateMatch} teams={INITIAL_TEAMS} user={user} playerName={playerName} initialFilter={matchesFilter} />;
       case 'teams': return <TeamsList teams={INITIAL_TEAMS} />;
       case 'rules': return <RulesPage />;
-      default: return <Dashboard standings={standings} matches={matches} teams={INITIAL_TEAMS} onMatchClick={setEditingMatch} />;
+      default: return <Dashboard standings={standings} matches={matches} teams={INITIAL_TEAMS} onMatchClick={setEditingMatch} onViewAllMatches={() => { setMatchesFilter('completed'); setActiveTab('matches'); }} />;
     }
   };
 
@@ -651,10 +660,10 @@ export default function App() {
             </button>
 
             <div className="hidden md:flex gap-6 text-sm font-medium">
-              <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<Activity />}>Dashboard</NavBtn>
-              <NavBtn active={activeTab === 'matches'} onClick={() => setActiveTab('matches')} icon={<Calendar />}>Matches</NavBtn>
-              <NavBtn active={activeTab === 'teams'} onClick={() => setActiveTab('teams')} icon={<Users />}>Teams</NavBtn>
-              <NavBtn active={activeTab === 'rules'} onClick={() => setActiveTab('rules')} icon={<Zap />}>Rules</NavBtn>
+              <NavBtn active={activeTab === 'dashboard'} onClick={() => handleTabChange('dashboard')} icon={<Activity />}>Dashboard</NavBtn>
+              <NavBtn active={activeTab === 'matches'} onClick={() => handleTabChange('matches')} icon={<Calendar />}>Matches</NavBtn>
+              <NavBtn active={activeTab === 'teams'} onClick={() => handleTabChange('teams')} icon={<Users />}>Teams</NavBtn>
+              <NavBtn active={activeTab === 'rules'} onClick={() => handleTabChange('rules')} icon={<Zap />}>Rules</NavBtn>
             </div>
 
             {/* User Profile */}
@@ -729,10 +738,10 @@ export default function App() {
 
       {/* Mobile Bottom Nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/90 backdrop-blur-lg border-t border-white/5 flex justify-around p-3 pb-safe z-50">
-        <MobileNavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<Activity size={20} />} label="Dash" />
-        <MobileNavBtn active={activeTab === 'matches'} onClick={() => setActiveTab('matches')} icon={<Calendar size={20} />} label="Matches" />
-        <MobileNavBtn active={activeTab === 'teams'} onClick={() => setActiveTab('teams')} icon={<Users size={20} />} label="Teams" />
-        <MobileNavBtn active={activeTab === 'rules'} onClick={() => setActiveTab('rules')} icon={<Medal size={20} />} label="Playoffs" />
+        <MobileNavBtn active={activeTab === 'dashboard'} onClick={() => handleTabChange('dashboard')} icon={<Activity size={20} />} label="Dash" />
+        <MobileNavBtn active={activeTab === 'matches'} onClick={() => handleTabChange('matches')} icon={<Calendar size={20} />} label="Matches" />
+        <MobileNavBtn active={activeTab === 'teams'} onClick={() => handleTabChange('teams')} icon={<Users size={20} />} label="Teams" />
+        <MobileNavBtn active={activeTab === 'rules'} onClick={() => handleTabChange('rules')} icon={<Medal size={20} />} label="Playoffs" />
       </nav>
     </div>
     </PlayersProvider>
@@ -767,7 +776,7 @@ const MobileNavBtn = ({ active, onClick, icon, label }) => (
 
 // --- DASHBOARD ---
 
-const Dashboard = ({ standings, matches, teams, onMatchClick }) => {
+const Dashboard = ({ standings, matches, teams, onMatchClick, onViewAllMatches }) => {
   const { getPlayerName } = usePlayers();
 
   // Sort upcoming matches by date (matches with dates first, then by date, then by ID)
@@ -965,8 +974,17 @@ const Dashboard = ({ standings, matches, teams, onMatchClick }) => {
 
         {/* Recent Results */}
         <Card>
-          <div className="p-4 border-b border-white/5">
+          <div className="p-4 border-b border-white/5 flex justify-between items-center">
              <h3 className="font-bold text-slate-200">Recent Results</h3>
+             {recentMatches.length > 0 && (
+               <button
+                 onClick={onViewAllMatches}
+                 className="text-xs text-lime-400 hover:text-lime-300 transition-colors flex items-center gap-1"
+               >
+                 View All
+                 <ChevronRight className="w-3 h-3" />
+               </button>
+             )}
           </div>
           <div className="divide-y divide-white/5">
              {recentMatches.length === 0 ? (
@@ -975,37 +993,46 @@ const Dashboard = ({ standings, matches, teams, onMatchClick }) => {
               <div
                 key={m.id}
                 onClick={() => onMatchClick(m)}
-                className="p-3 hover:bg-white/5 transition-colors cursor-pointer group"
+                className="p-4 hover:bg-white/5 transition-colors cursor-pointer group"
               >
-                <div className="flex items-center justify-between gap-3">
-                  {/* Teams and Score - Compact */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-sm font-semibold truncate ${m.winner === m.teamA ? 'text-lime-400' : 'text-slate-400'}`}>
-                        {getTeamName(m.teamA)}
-                      </span>
-                      <span className="text-xs text-slate-600">vs</span>
-                      <span className={`text-sm font-semibold truncate ${m.winner === m.teamB ? 'text-lime-400' : 'text-slate-400'}`}>
-                        {getTeamName(m.teamB)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
-                      {m.reportedDate && (
-                        <>
-                          <Calendar className="w-3 h-3" />
-                          <span>Reported {formatDate(m.reportedDate)}</span>
-                        </>
-                      )}
+                <div className="flex items-start gap-3">
+                  <div className="text-xs text-slate-500 font-mono">#{m.id}</div>
+                  <div className="flex-1 space-y-1">
+                    {m.reportedDate && (
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-3 h-3 text-slate-500" />
+                        <span className="text-xs text-slate-500">{formatDate(m.reportedDate)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center gap-2">
+                      <div className="flex-1">
+                        <div className={`font-semibold text-sm ${m.winner === m.teamA ? 'text-lime-400' : 'text-slate-400'}`}>
+                          {getTeamName(m.teamA)}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {getPlayerName(m.pA1)}/{getPlayerName(m.pA2)}
+                        </div>
+                      </div>
+                      <div className="text-center px-2">
+                        <div className="font-mono font-bold text-base text-white">{m.score}</div>
+                        {m.games && m.games.length > 0 && (
+                          <div className="text-[9px] text-slate-600 space-x-1">
+                            {m.games.filter(g => g.scoreA && g.scoreB).map((game, i) => (
+                              <span key={i}>{game.scoreA}-{game.scoreB}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 text-right">
+                        <div className={`font-semibold text-sm ${m.winner === m.teamB ? 'text-lime-400' : 'text-slate-400'}`}>
+                          {getTeamName(m.teamB)}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {getPlayerName(m.pB1)}/{getPlayerName(m.pB2)}
+                        </div>
+                      </div>
                     </div>
                   </div>
-
-                  {/* Score */}
-                  <div className="text-center">
-                    <div className="font-mono font-bold text-lg text-white">{m.score}</div>
-                  </div>
-
-                  {/* Chevron indicator */}
-                  <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-400 transition-colors flex-shrink-0" />
                 </div>
               </div>
             ))}
@@ -1018,7 +1045,7 @@ const Dashboard = ({ standings, matches, teams, onMatchClick }) => {
 
 // --- MATCH SCHEDULE & REPORTING ---
 
-const MatchSchedule = ({ matches, updateMatch, teams, user, playerName }) => {
+const MatchSchedule = ({ matches, updateMatch, teams, user, playerName, initialFilter = 'all' }) => {
   const { getPlayerName } = usePlayers();
   const [filterTeam, setFilterTeam] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -1026,6 +1053,7 @@ const MatchSchedule = ({ matches, updateMatch, teams, user, playerName }) => {
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [editingMatch, setEditingMatch] = useState(null);
   const [sortBy, setSortBy] = useState('id'); // 'id', 'date', 'status'
+  const [completionFilter, setCompletionFilter] = useState(initialFilter); // 'all', 'completed', 'upcoming'
 
   // Close autocomplete when clicking outside
   useEffect(() => {
@@ -1062,6 +1090,10 @@ const MatchSchedule = ({ matches, updateMatch, teams, user, playerName }) => {
   // Filter and sort matches by team and/or player
   const filteredMatches = matches
     .filter(m => {
+      // Completion filter
+      if (completionFilter === 'completed' && !m.winner) return false;
+      if (completionFilter === 'upcoming' && m.winner) return false;
+
       // Team filter
       const teamMatch = filterTeam === 'All' || m.teamA === filterTeam || m.teamB === filterTeam;
 
@@ -1079,6 +1111,14 @@ const MatchSchedule = ({ matches, updateMatch, teams, user, playerName }) => {
       return teamMatch;
     })
     .sort((a, b) => {
+      // When showing completed matches, sort by reported date descending
+      if (completionFilter === 'completed') {
+        if (a.reportedDate && b.reportedDate) {
+          return new Date(b.reportedDate) - new Date(a.reportedDate);
+        }
+        return b.id - a.id;
+      }
+
       if (sortBy === 'date') {
         // Sort by date: scheduled dates first (ascending), then unscheduled by ID
         if (a.scheduledDate && !b.scheduledDate) return -1;
@@ -1160,31 +1200,58 @@ const MatchSchedule = ({ matches, updateMatch, teams, user, playerName }) => {
         ))}
       </div>
 
-      {/* Sort Options */}
+      {/* Completion Filter */}
       <div className="flex items-center gap-2">
-        <span className="text-xs text-slate-500 font-medium">Sort by:</span>
+        <span className="text-xs text-slate-500 font-medium">Show:</span>
         <div className="flex gap-2">
           <button
-            onClick={() => setSortBy('id')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${sortBy === 'id' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'}`}
+            onClick={() => setCompletionFilter('all')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${completionFilter === 'all' ? 'bg-lime-500/20 text-lime-400 border border-lime-500/30' : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'}`}
           >
-            Game #
+            All Matches
           </button>
           <button
-            onClick={() => setSortBy('date')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1 ${sortBy === 'date' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'}`}
+            onClick={() => setCompletionFilter('completed')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${completionFilter === 'completed' ? 'bg-lime-500/20 text-lime-400 border border-lime-500/30' : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'}`}
           >
-            <Calendar className="w-3 h-3" />
-            Date
+            Completed
           </button>
           <button
-            onClick={() => setSortBy('status')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${sortBy === 'status' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'}`}
+            onClick={() => setCompletionFilter('upcoming')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${completionFilter === 'upcoming' ? 'bg-lime-500/20 text-lime-400 border border-lime-500/30' : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'}`}
           >
-            Status
+            Upcoming
           </button>
         </div>
       </div>
+
+      {/* Sort Options - Hidden when viewing completed matches */}
+      {completionFilter !== 'completed' && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-500 font-medium">Sort by:</span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSortBy('id')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${sortBy === 'id' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'}`}
+            >
+              Game #
+            </button>
+            <button
+              onClick={() => setSortBy('date')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1 ${sortBy === 'date' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'}`}
+            >
+              <Calendar className="w-3 h-3" />
+              Date
+            </button>
+            <button
+              onClick={() => setSortBy('status')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${sortBy === 'status' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'}`}
+            >
+              Status
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Player Search with Autocomplete */}
       <div className="relative player-search-container">
@@ -1262,12 +1329,13 @@ const MatchSchedule = ({ matches, updateMatch, teams, user, playerName }) => {
       </div>
 
       {/* Results Summary */}
-      {(searchQuery || filterTeam !== 'All') && (
+      {(searchQuery || filterTeam !== 'All' || completionFilter !== 'all') && (
         <div className="flex items-center gap-2 text-xs text-slate-400">
           <Filter className="w-3 h-3" />
           <span>
             Showing {filteredMatches.length} {filteredMatches.length === 1 ? 'match' : 'matches'}
             {searchQuery && ` for "${searchQuery}"`}
+            {completionFilter === 'completed' && ' (sorted by most recent)'}
           </span>
         </div>
       )}
@@ -1281,6 +1349,7 @@ const MatchSchedule = ({ matches, updateMatch, teams, user, playerName }) => {
               onClick={() => {
                 setFilterTeam('All');
                 setSearchQuery('');
+                setCompletionFilter('all');
               }}
               className="text-sm text-lime-400 hover:text-lime-300 transition-colors"
             >
@@ -1399,7 +1468,13 @@ const MatchCard = ({ match, teams, searchQuery = '', onEdit }) => {
           <Badge className={`${matchStatus.className} self-start`}>
             {matchStatus.label}
           </Badge>
-          {match.scheduledDate && (
+          {isPlayed && match.reportedDate && (
+            <div className="flex items-center gap-1.5 text-xs text-slate-400">
+              <Calendar className="w-3 h-3" />
+              <span>{formatDate(match.reportedDate)}</span>
+            </div>
+          )}
+          {!isPlayed && match.scheduledDate && (
             <div className="flex items-center gap-1.5 text-xs text-slate-400">
               <Calendar className="w-3 h-3" />
               <span>{formatDate(match.scheduledDate)}</span>
