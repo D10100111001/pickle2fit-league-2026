@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, createContext, useContext } from 'react';
 import {
   Trophy,
   Calendar,
@@ -66,140 +66,268 @@ const appId = import.meta.env.VITE_APP_ID || 'pickle2fit-league-2026';
 
 // --- Initial Data ---
 
+// Player registry with unique IDs
+const INITIAL_PLAYERS = {
+  player_1: { id: 'player_1', name: 'Azeem Muhammad' },
+  player_2: { id: 'player_2', name: 'Iqbal Qasim' },
+  player_3: { id: 'player_3', name: 'Wasef' },
+  player_4: { id: 'player_4', name: 'Qavi' },
+  player_5: { id: 'player_5', name: 'Ikram' },
+  player_6: { id: 'player_6', name: 'Sabih' },
+  player_7: { id: 'player_7', name: 'Taha R' },
+  player_8: { id: 'player_8', name: 'Anas' },
+  player_9: { id: 'player_9', name: 'Junaid A' },
+  player_10: { id: 'player_10', name: 'Qhyam' },
+  player_11: { id: 'player_11', name: 'Adil' },
+  player_12: { id: 'player_12', name: 'Fateh' },
+  player_13: { id: 'player_13', name: 'Taha M' },
+  player_14: { id: 'player_14', name: 'Shahrukh' },
+  player_15: { id: 'player_15', name: 'Nasheet' },
+  player_16: { id: 'player_16', name: 'Naseer' },
+  player_17: { id: 'player_17', name: 'Junaid M' },
+  player_18: { id: 'player_18', name: 'Saleem' },
+  player_19: { id: 'player_19', name: 'Owais' },
+  player_20: { id: 'player_20', name: 'MJ' },
+  player_21: { id: 'player_21', name: 'Madni' },
+  player_22: { id: 'player_22', name: 'Salman' },
+  player_23: { id: 'player_23', name: 'Yaseer' },
+  player_24: { id: 'player_24', name: 'Pomi' },
+  player_25: { id: 'player_25', name: 'Jabir Bhai' },
+  player_26: { id: 'player_26', name: 'Yousaf' },
+  player_27: { id: 'player_27', name: 'Zafar' },
+  player_28: { id: 'player_28', name: 'Naveed' },
+  player_29: { id: 'player_29', name: 'Javed C' },
+  player_30: { id: 'player_30', name: 'Raza D' },
+  player_31: { id: 'player_31', name: 'Rafey' },
+  player_32: { id: 'player_32', name: 'Danial S' }
+};
+
 const INITIAL_TEAMS = [
   {
     id: 'team1',
     name: 'Naan-Stop Picklers',
-    captain: 'Azeem Muhammad',
-    players: ['Azeem Muhammad', 'Iqbal Qasim', 'Wasef', 'Qavi', 'Ikram', 'Sabih', 'Taha R', 'Anas'],
-    color: 'from-blue-500 to-cyan-400'
+    captain: 'player_1',
+    players: ['player_1', 'player_2', 'player_3', 'player_4', 'player_5', 'player_6', 'player_7', 'player_8'],
+    color: 'from-blue-500 to-cyan-400',
+    logo: '/logos/naan-stop-picklers.png'
   },
   {
     id: 'team2',
     name: 'Striking Falcons',
-    captain: 'Junaid A',
-    players: ['Junaid A', 'Qhyam', 'Adil', 'Fateh', 'Taha M', 'Shahrukh', 'Nasheet', 'Naseer'],
-    color: 'from-red-500 to-orange-400'
+    captain: 'player_9',
+    players: ['player_9', 'player_10', 'player_11', 'player_12', 'player_13', 'player_14', 'player_15', 'player_16'],
+    color: 'from-red-500 to-orange-400',
+    logo: '/logos/striking-falcons.png'
   },
   {
     id: 'team3',
     name: 'Pickle Warriors',
-    captain: 'Junaid M',
-    players: ['Junaid M', 'Saleem', 'Owais', 'MJ', 'Madni', 'Salman', 'Yaseer', 'Pomi'],
-    color: 'from-emerald-500 to-lime-400'
+    captain: 'player_17',
+    players: ['player_17', 'player_18', 'player_19', 'player_20', 'player_21', 'player_22', 'player_23', 'player_24'],
+    color: 'from-emerald-500 to-lime-400',
+    logo: '/logos/pickle-warriors.png'
   },
   {
     id: 'team4',
     name: 'BadMashers',
-    captain: 'Jabir Bhai',
-    players: ['Jabir Bhai', 'Yousaf', 'Zafar', 'Naveed', 'Javed C', 'Raza D', 'Rafey', 'Danial S'],
-    color: 'from-purple-500 to-pink-400'
+    captain: 'player_25',
+    players: ['player_25', 'player_26', 'player_27', 'player_28', 'player_29', 'player_30', 'player_31', 'player_32'],
+    color: 'from-purple-500 to-pink-400',
+    logo: '/logos/badmashers.png'
   }
 ];
 
 // Complete schedule of all 96 games
 const SEEDED_MATCHES = [
-  { id: 1, teamA: 'team1', pA1: 'Azeem Muhammad', pA2: 'Anas', teamB: 'team3', pB1: 'Junaid M', pB2: 'Pomi', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 2, teamA: 'team1', pA1: 'Iqbal Qasim', pA2: 'Taha R', teamB: 'team3', pB1: 'Saleem', pB2: 'Yaseer', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 3, teamA: 'team1', pA1: 'Wasef', pA2: 'Sabih', teamB: 'team3', pB1: 'Owais', pB2: 'Salman', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 4, teamA: 'team1', pA1: 'Qavi', pA2: 'Ikram', teamB: 'team3', pB1: 'MJ', pB2: 'Madni', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 5, teamA: 'team1', pA1: 'Azeem Muhammad', pA2: 'Taha R', teamB: 'team4', pB1: 'Jabir Bhai', pB2: 'Danial S', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 6, teamA: 'team1', pA1: 'Anas', pA2: 'Sabih', teamB: 'team4', pB1: 'Yousaf', pB2: 'Rafey', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 7, teamA: 'team1', pA1: 'Iqbal Qasim', pA2: 'Ikram', teamB: 'team4', pB1: 'Zafar', pB2: 'Raza D', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 8, teamA: 'team1', pA1: 'Wasef', pA2: 'Qavi', teamB: 'team4', pB1: 'Naveed', pB2: 'Javed C', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 9, teamA: 'team2', pA1: 'Junaid A', pA2: 'Naseer', teamB: 'team4', pB1: 'Jabir Bhai', pB2: 'Rafey', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 10, teamA: 'team2', pA1: 'Qhyam', pA2: 'Nasheet', teamB: 'team4', pB1: 'Danial S', pB2: 'Raza D', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 11, teamA: 'team2', pA1: 'Adil', pA2: 'Shahrukh', teamB: 'team4', pB1: 'Yousaf', pB2: 'Javed C', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 12, teamA: 'team2', pA1: 'Fateh', pA2: 'Taha M', teamB: 'team4', pB1: 'Zafar', pB2: 'Naveed', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 13, teamA: 'team2', pA1: 'Junaid A', pA2: 'Nasheet', teamB: 'team3', pB1: 'Junaid M', pB2: 'Yaseer', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 14, teamA: 'team2', pA1: 'Naseer', pA2: 'Shahrukh', teamB: 'team3', pB1: 'Pomi', pB2: 'Salman', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 15, teamA: 'team2', pA1: 'Qhyam', pA2: 'Taha M', teamB: 'team3', pB1: 'Saleem', pB2: 'Madni', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 16, teamA: 'team2', pA1: 'Adil', pA2: 'Fateh', teamB: 'team3', pB1: 'Owais', pB2: 'MJ', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 17, teamA: 'team1', pA1: 'Azeem Muhammad', pA2: 'Sabih', teamB: 'team2', pB1: 'Junaid A', pB2: 'Shahrukh', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 18, teamA: 'team1', pA1: 'Taha R', pA2: 'Ikram', teamB: 'team2', pB1: 'Nasheet', pB2: 'Taha M', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 19, teamA: 'team1', pA1: 'Anas', pA2: 'Qavi', teamB: 'team2', pB1: 'Naseer', pB2: 'Fateh', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 20, teamA: 'team1', pA1: 'Iqbal Qasim', pA2: 'Wasef', teamB: 'team2', pB1: 'Qhyam', pB2: 'Adil', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 21, teamA: 'team3', pA1: 'Junaid M', pA2: 'Salman', teamB: 'team4', pB1: 'Jabir Bhai', pB2: 'Raza D', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 22, teamA: 'team3', pA1: 'Yaseer', pA2: 'Madni', teamB: 'team4', pB1: 'Rafey', pB2: 'Javed C', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 23, teamA: 'team3', pA1: 'Pomi', pA2: 'MJ', teamB: 'team4', pB1: 'Danial S', pB2: 'Naveed', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 24, teamA: 'team3', pA1: 'Saleem', pA2: 'Owais', teamB: 'team4', pB1: 'Yousaf', pB2: 'Zafar', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 25, teamA: 'team2', pA1: 'Junaid A', pA2: 'Taha M', teamB: 'team4', pB1: 'Jabir Bhai', pB2: 'Javed C', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 26, teamA: 'team2', pA1: 'Shahrukh', pA2: 'Fateh', teamB: 'team4', pB1: 'Raza D', pB2: 'Naveed', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 27, teamA: 'team2', pA1: 'Nasheet', pA2: 'Adil', teamB: 'team4', pB1: 'Rafey', pB2: 'Zafar', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 28, teamA: 'team2', pA1: 'Naseer', pA2: 'Qhyam', teamB: 'team4', pB1: 'Danial S', pB2: 'Yousaf', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 29, teamA: 'team1', pA1: 'Azeem Muhammad', pA2: 'Ikram', teamB: 'team3', pB1: 'Junaid M', pB2: 'Madni', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 30, teamA: 'team1', pA1: 'Sabih', pA2: 'Qavi', teamB: 'team3', pB1: 'Salman', pB2: 'MJ', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 31, teamA: 'team1', pA1: 'Taha R', pA2: 'Wasef', teamB: 'team3', pB1: 'Yaseer', pB2: 'Owais', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 32, teamA: 'team1', pA1: 'Anas', pA2: 'Iqbal Qasim', teamB: 'team3', pB1: 'Pomi', pB2: 'Saleem', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 33, teamA: 'team1', pA1: 'Azeem Muhammad', pA2: 'Qavi', teamB: 'team2', pB1: 'Junaid A', pB2: 'Fateh', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 34, teamA: 'team1', pA1: 'Ikram', pA2: 'Wasef', teamB: 'team2', pB1: 'Taha M', pB2: 'Adil', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 35, teamA: 'team1', pA1: 'Sabih', pA2: 'Iqbal Qasim', teamB: 'team2', pB1: 'Shahrukh', pB2: 'Qhyam', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 36, teamA: 'team1', pA1: 'Taha R', pA2: 'Anas', teamB: 'team2', pB1: 'Nasheet', pB2: 'Naseer', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 37, teamA: 'team2', pA1: 'Junaid A', pA2: 'Adil', teamB: 'team3', pB1: 'Junaid M', pB2: 'MJ', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 38, teamA: 'team2', pA1: 'Fateh', pA2: 'Qhyam', teamB: 'team3', pB1: 'Madni', pB2: 'Owais', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 39, teamA: 'team2', pA1: 'Taha M', pA2: 'Naseer', teamB: 'team3', pB1: 'Salman', pB2: 'Saleem', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 40, teamA: 'team2', pA1: 'Shahrukh', pA2: 'Nasheet', teamB: 'team3', pB1: 'Yaseer', pB2: 'Pomi', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 41, teamA: 'team1', pA1: 'Azeem Muhammad', pA2: 'Wasef', teamB: 'team4', pB1: 'Jabir Bhai', pB2: 'Naveed', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 42, teamA: 'team1', pA1: 'Qavi', pA2: 'Iqbal Qasim', teamB: 'team4', pB1: 'Javed C', pB2: 'Zafar', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 43, teamA: 'team1', pA1: 'Ikram', pA2: 'Anas', teamB: 'team4', pB1: 'Raza D', pB2: 'Yousaf', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 44, teamA: 'team1', pA1: 'Sabih', pA2: 'Taha R', teamB: 'team4', pB1: 'Rafey', pB2: 'Danial S', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 45, teamA: 'team3', pA1: 'Junaid M', pA2: 'Owais', teamB: 'team4', pB1: 'Jabir Bhai', pB2: 'Zafar', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 46, teamA: 'team3', pA1: 'MJ', pA2: 'Saleem', teamB: 'team4', pB1: 'Naveed', pB2: 'Yousaf', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 47, teamA: 'team3', pA1: 'Madni', pA2: 'Pomi', teamB: 'team4', pB1: 'Javed C', pB2: 'Danial S', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 48, teamA: 'team3', pA1: 'Salman', pA2: 'Yaseer', teamB: 'team4', pB1: 'Raza D', pB2: 'Rafey', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 49, teamA: 'team1', pA1: 'Azeem Muhammad', pA2: 'Iqbal Qasim', teamB: 'team4', pB1: 'Jabir Bhai', pB2: 'Yousaf', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 50, teamA: 'team1', pA1: 'Wasef', pA2: 'Anas', teamB: 'team4', pB1: 'Zafar', pB2: 'Danial S', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 51, teamA: 'team1', pA1: 'Qavi', pA2: 'Taha R', teamB: 'team4', pB1: 'Naveed', pB2: 'Rafey', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 52, teamA: 'team1', pA1: 'Ikram', pA2: 'Sabih', teamB: 'team4', pB1: 'Javed C', pB2: 'Raza D', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 53, teamA: 'team1', pA1: 'Azeem Muhammad', pA2: 'Anas', teamB: 'team2', pB1: 'Junaid A', pB2: 'Qhyam', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 54, teamA: 'team1', pA1: 'Iqbal Qasim', pA2: 'Taha R', teamB: 'team2', pB1: 'Adil', pB2: 'Naseer', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 55, teamA: 'team1', pA1: 'Wasef', pA2: 'Sabih', teamB: 'team2', pB1: 'Fateh', pB2: 'Nasheet', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 56, teamA: 'team1', pA1: 'Qavi', pA2: 'Ikram', teamB: 'team2', pB1: 'Taha M', pB2: 'Shahrukh', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 57, teamA: 'team2', pA1: 'Junaid A', pA2: 'Naseer', teamB: 'team3', pB1: 'Junaid M', pB2: 'Saleem', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 58, teamA: 'team2', pA1: 'Qhyam', pA2: 'Nasheet', teamB: 'team3', pB1: 'Owais', pB2: 'Pomi', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 59, teamA: 'team2', pA1: 'Adil', pA2: 'Shahrukh', teamB: 'team3', pB1: 'MJ', pB2: 'Yaseer', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 60, teamA: 'team2', pA1: 'Fateh', pA2: 'Taha M', teamB: 'team3', pB1: 'Madni', pB2: 'Salman', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 61, teamA: 'team2', pA1: 'Junaid A', pA2: 'Nasheet', teamB: 'team4', pB1: 'Jabir Bhai', pB2: 'Danial S', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 62, teamA: 'team2', pA1: 'Naseer', pA2: 'Shahrukh', teamB: 'team4', pB1: 'Yousaf', pB2: 'Rafey', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 63, teamA: 'team2', pA1: 'Qhyam', pA2: 'Taha M', teamB: 'team4', pB1: 'Zafar', pB2: 'Raza D', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 64, teamA: 'team2', pA1: 'Adil', pA2: 'Fateh', teamB: 'team4', pB1: 'Naveed', pB2: 'Javed C', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 65, teamA: 'team3', pA1: 'Junaid M', pA2: 'Pomi', teamB: 'team4', pB1: 'Jabir Bhai', pB2: 'Rafey', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 66, teamA: 'team3', pA1: 'Saleem', pA2: 'Yaseer', teamB: 'team4', pB1: 'Danial S', pB2: 'Raza D', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 67, teamA: 'team3', pA1: 'Owais', pA2: 'Salman', teamB: 'team4', pB1: 'Yousaf', pB2: 'Javed C', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 68, teamA: 'team3', pA1: 'MJ', pA2: 'Madni', teamB: 'team4', pB1: 'Zafar', pB2: 'Naveed', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 69, teamA: 'team1', pA1: 'Azeem Muhammad', pA2: 'Taha R', teamB: 'team3', pB1: 'Junaid M', pB2: 'Yaseer', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 70, teamA: 'team1', pA1: 'Anas', pA2: 'Sabih', teamB: 'team3', pB1: 'Pomi', pB2: 'Salman', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 71, teamA: 'team1', pA1: 'Iqbal Qasim', pA2: 'Ikram', teamB: 'team3', pB1: 'Saleem', pB2: 'Madni', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 72, teamA: 'team1', pA1: 'Wasef', pA2: 'Qavi', teamB: 'team3', pB1: 'Owais', pB2: 'MJ', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 73, teamA: 'team2', pA1: 'Junaid A', pA2: 'Shahrukh', teamB: 'team3', pB1: 'Junaid M', pB2: 'Salman', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 74, teamA: 'team2', pA1: 'Nasheet', pA2: 'Taha M', teamB: 'team3', pB1: 'Yaseer', pB2: 'Madni', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 75, teamA: 'team2', pA1: 'Naseer', pA2: 'Fateh', teamB: 'team3', pB1: 'Pomi', pB2: 'MJ', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 76, teamA: 'team2', pA1: 'Qhyam', pA2: 'Adil', teamB: 'team3', pB1: 'Saleem', pB2: 'Owais', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 77, teamA: 'team1', pA1: 'Azeem Muhammad', pA2: 'Sabih', teamB: 'team3', pB1: 'Junaid M', pB2: 'Madni', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 78, teamA: 'team1', pA1: 'Taha R', pA2: 'Ikram', teamB: 'team3', pB1: 'Salman', pB2: 'MJ', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 79, teamA: 'team1', pA1: 'Anas', pA2: 'Qavi', teamB: 'team3', pB1: 'Yaseer', pB2: 'Owais', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 80, teamA: 'team1', pA1: 'Iqbal Qasim', pA2: 'Wasef', teamB: 'team3', pB1: 'Pomi', pB2: 'Saleem', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 81, teamA: 'team1', pA1: 'Azeem Muhammad', pA2: 'Ikram', teamB: 'team4', pB1: 'Jabir Bhai', pB2: 'Raza D', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 82, teamA: 'team1', pA1: 'Sabih', pA2: 'Qavi', teamB: 'team4', pB1: 'Rafey', pB2: 'Javed C', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 83, teamA: 'team1', pA1: 'Taha R', pA2: 'Wasef', teamB: 'team4', pB1: 'Danial S', pB2: 'Naveed', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 84, teamA: 'team1', pA1: 'Anas', pA2: 'Iqbal Qasim', teamB: 'team4', pB1: 'Yousaf', pB2: 'Zafar', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 85, teamA: 'team3', pA1: 'Junaid M', pA2: 'MJ', teamB: 'team4', pB1: 'Jabir Bhai', pB2: 'Javed C', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 86, teamA: 'team3', pA1: 'Madni', pA2: 'Owais', teamB: 'team4', pB1: 'Raza D', pB2: 'Naveed', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 87, teamA: 'team3', pA1: 'Salman', pA2: 'Saleem', teamB: 'team4', pB1: 'Rafey', pB2: 'Zafar', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 88, teamA: 'team3', pA1: 'Yaseer', pA2: 'Pomi', teamB: 'team4', pB1: 'Danial S', pB2: 'Yousaf', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 89, teamA: 'team1', pA1: 'Azeem Muhammad', pA2: 'Qavi', teamB: 'team2', pB1: 'Junaid A', pB2: 'Taha M', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 90, teamA: 'team1', pA1: 'Ikram', pA2: 'Wasef', teamB: 'team2', pB1: 'Shahrukh', pB2: 'Fateh', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 91, teamA: 'team1', pA1: 'Sabih', pA2: 'Iqbal Qasim', teamB: 'team2', pB1: 'Nasheet', pB2: 'Adil', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 92, teamA: 'team1', pA1: 'Taha R', pA2: 'Anas', teamB: 'team2', pB1: 'Naseer', pB2: 'Qhyam', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 93, teamA: 'team2', pA1: 'Junaid A', pA2: 'Fateh', teamB: 'team4', pB1: 'Jabir Bhai', pB2: 'Naveed', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 94, teamA: 'team2', pA1: 'Taha M', pA2: 'Adil', teamB: 'team4', pB1: 'Javed C', pB2: 'Zafar', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 95, teamA: 'team2', pA1: 'Shahrukh', pA2: 'Qhyam', teamB: 'team4', pB1: 'Raza D', pB2: 'Yousaf', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
-  { id: 96, teamA: 'team2', pA1: 'Nasheet', pA2: 'Naseer', teamB: 'team4', pB1: 'Rafey', pB2: 'Danial S', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 1, teamA: 'team1', pA1: 'player_1', pA2: 'player_8', teamB: 'team3', pB1: 'player_17', pB2: 'player_24', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 2, teamA: 'team1', pA1: 'player_2', pA2: 'player_7', teamB: 'team3', pB1: 'player_18', pB2: 'player_23', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 3, teamA: 'team1', pA1: 'player_3', pA2: 'player_6', teamB: 'team3', pB1: 'player_19', pB2: 'player_22', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 4, teamA: 'team1', pA1: 'player_4', pA2: 'player_5', teamB: 'team3', pB1: 'player_20', pB2: 'player_21', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 5, teamA: 'team1', pA1: 'player_1', pA2: 'player_7', teamB: 'team4', pB1: 'player_25', pB2: 'player_32', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 6, teamA: 'team1', pA1: 'player_8', pA2: 'player_6', teamB: 'team4', pB1: 'player_26', pB2: 'player_31', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 7, teamA: 'team1', pA1: 'player_2', pA2: 'player_5', teamB: 'team4', pB1: 'player_27', pB2: 'player_30', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 8, teamA: 'team1', pA1: 'player_3', pA2: 'player_4', teamB: 'team4', pB1: 'player_28', pB2: 'player_29', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 9, teamA: 'team2', pA1: 'player_9', pA2: 'player_16', teamB: 'team4', pB1: 'player_25', pB2: 'player_31', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 10, teamA: 'team2', pA1: 'player_10', pA2: 'player_15', teamB: 'team4', pB1: 'player_32', pB2: 'player_30', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 11, teamA: 'team2', pA1: 'player_11', pA2: 'player_14', teamB: 'team4', pB1: 'player_26', pB2: 'player_29', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 12, teamA: 'team2', pA1: 'player_12', pA2: 'player_13', teamB: 'team4', pB1: 'player_27', pB2: 'player_28', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 13, teamA: 'team2', pA1: 'player_9', pA2: 'player_15', teamB: 'team3', pB1: 'player_17', pB2: 'player_23', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 14, teamA: 'team2', pA1: 'player_16', pA2: 'player_14', teamB: 'team3', pB1: 'player_24', pB2: 'player_22', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 15, teamA: 'team2', pA1: 'player_10', pA2: 'player_13', teamB: 'team3', pB1: 'player_18', pB2: 'player_21', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 16, teamA: 'team2', pA1: 'player_11', pA2: 'player_12', teamB: 'team3', pB1: 'player_19', pB2: 'player_20', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 17, teamA: 'team1', pA1: 'player_1', pA2: 'player_6', teamB: 'team2', pB1: 'player_9', pB2: 'player_14', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 18, teamA: 'team1', pA1: 'player_7', pA2: 'player_5', teamB: 'team2', pB1: 'player_15', pB2: 'player_13', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 19, teamA: 'team1', pA1: 'player_8', pA2: 'player_4', teamB: 'team2', pB1: 'player_16', pB2: 'player_12', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 20, teamA: 'team1', pA1: 'player_2', pA2: 'player_3', teamB: 'team2', pB1: 'player_10', pB2: 'player_11', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 21, teamA: 'team3', pA1: 'player_17', pA2: 'player_22', teamB: 'team4', pB1: 'player_25', pB2: 'player_30', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 22, teamA: 'team3', pA1: 'player_23', pA2: 'player_21', teamB: 'team4', pB1: 'player_31', pB2: 'player_29', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 23, teamA: 'team3', pA1: 'player_24', pA2: 'player_20', teamB: 'team4', pB1: 'player_32', pB2: 'player_28', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 24, teamA: 'team3', pA1: 'player_18', pA2: 'player_19', teamB: 'team4', pB1: 'player_26', pB2: 'player_27', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 25, teamA: 'team2', pA1: 'player_9', pA2: 'player_13', teamB: 'team4', pB1: 'player_25', pB2: 'player_29', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 26, teamA: 'team2', pA1: 'player_14', pA2: 'player_12', teamB: 'team4', pB1: 'player_30', pB2: 'player_28', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 27, teamA: 'team2', pA1: 'player_15', pA2: 'player_11', teamB: 'team4', pB1: 'player_31', pB2: 'player_27', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 28, teamA: 'team2', pA1: 'player_16', pA2: 'player_10', teamB: 'team4', pB1: 'player_32', pB2: 'player_26', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 29, teamA: 'team1', pA1: 'player_1', pA2: 'player_5', teamB: 'team3', pB1: 'player_17', pB2: 'player_21', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 30, teamA: 'team1', pA1: 'player_6', pA2: 'player_4', teamB: 'team3', pB1: 'player_22', pB2: 'player_20', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 31, teamA: 'team1', pA1: 'player_7', pA2: 'player_3', teamB: 'team3', pB1: 'player_23', pB2: 'player_19', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 32, teamA: 'team1', pA1: 'player_8', pA2: 'player_2', teamB: 'team3', pB1: 'player_24', pB2: 'player_18', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 33, teamA: 'team1', pA1: 'player_1', pA2: 'player_4', teamB: 'team2', pB1: 'player_9', pB2: 'player_12', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 34, teamA: 'team1', pA1: 'player_5', pA2: 'player_3', teamB: 'team2', pB1: 'player_13', pB2: 'player_11', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 35, teamA: 'team1', pA1: 'player_6', pA2: 'player_2', teamB: 'team2', pB1: 'player_14', pB2: 'player_10', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 36, teamA: 'team1', pA1: 'player_7', pA2: 'player_8', teamB: 'team2', pB1: 'player_15', pB2: 'player_16', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 37, teamA: 'team2', pA1: 'player_9', pA2: 'player_11', teamB: 'team3', pB1: 'player_17', pB2: 'player_20', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 38, teamA: 'team2', pA1: 'player_12', pA2: 'player_10', teamB: 'team3', pB1: 'player_21', pB2: 'player_19', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 39, teamA: 'team2', pA1: 'player_13', pA2: 'player_16', teamB: 'team3', pB1: 'player_22', pB2: 'player_18', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 40, teamA: 'team2', pA1: 'player_14', pA2: 'player_15', teamB: 'team3', pB1: 'player_23', pB2: 'player_24', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 41, teamA: 'team1', pA1: 'player_1', pA2: 'player_3', teamB: 'team4', pB1: 'player_25', pB2: 'player_28', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 42, teamA: 'team1', pA1: 'player_4', pA2: 'player_2', teamB: 'team4', pB1: 'player_29', pB2: 'player_27', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 43, teamA: 'team1', pA1: 'player_5', pA2: 'player_8', teamB: 'team4', pB1: 'player_30', pB2: 'player_26', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 44, teamA: 'team1', pA1: 'player_6', pA2: 'player_7', teamB: 'team4', pB1: 'player_31', pB2: 'player_32', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 45, teamA: 'team3', pA1: 'player_17', pA2: 'player_19', teamB: 'team4', pB1: 'player_25', pB2: 'player_27', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 46, teamA: 'team3', pA1: 'player_20', pA2: 'player_18', teamB: 'team4', pB1: 'player_28', pB2: 'player_26', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 47, teamA: 'team3', pA1: 'player_21', pA2: 'player_24', teamB: 'team4', pB1: 'player_29', pB2: 'player_32', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 48, teamA: 'team3', pA1: 'player_22', pA2: 'player_23', teamB: 'team4', pB1: 'player_30', pB2: 'player_31', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 49, teamA: 'team1', pA1: 'player_1', pA2: 'player_2', teamB: 'team4', pB1: 'player_25', pB2: 'player_26', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 50, teamA: 'team1', pA1: 'player_3', pA2: 'player_8', teamB: 'team4', pB1: 'player_27', pB2: 'player_32', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 51, teamA: 'team1', pA1: 'player_4', pA2: 'player_7', teamB: 'team4', pB1: 'player_28', pB2: 'player_31', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 52, teamA: 'team1', pA1: 'player_5', pA2: 'player_6', teamB: 'team4', pB1: 'player_29', pB2: 'player_30', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 53, teamA: 'team1', pA1: 'player_1', pA2: 'player_8', teamB: 'team2', pB1: 'player_9', pB2: 'player_10', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 54, teamA: 'team1', pA1: 'player_2', pA2: 'player_7', teamB: 'team2', pB1: 'player_11', pB2: 'player_16', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 55, teamA: 'team1', pA1: 'player_3', pA2: 'player_6', teamB: 'team2', pB1: 'player_12', pB2: 'player_15', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 56, teamA: 'team1', pA1: 'player_4', pA2: 'player_5', teamB: 'team2', pB1: 'player_13', pB2: 'player_14', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 57, teamA: 'team2', pA1: 'player_9', pA2: 'player_16', teamB: 'team3', pB1: 'player_17', pB2: 'player_18', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 58, teamA: 'team2', pA1: 'player_10', pA2: 'player_15', teamB: 'team3', pB1: 'player_19', pB2: 'player_24', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 59, teamA: 'team2', pA1: 'player_11', pA2: 'player_14', teamB: 'team3', pB1: 'player_20', pB2: 'player_23', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 60, teamA: 'team2', pA1: 'player_12', pA2: 'player_13', teamB: 'team3', pB1: 'player_21', pB2: 'player_22', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 61, teamA: 'team2', pA1: 'player_9', pA2: 'player_15', teamB: 'team4', pB1: 'player_25', pB2: 'player_32', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 62, teamA: 'team2', pA1: 'player_16', pA2: 'player_14', teamB: 'team4', pB1: 'player_26', pB2: 'player_31', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 63, teamA: 'team2', pA1: 'player_10', pA2: 'player_13', teamB: 'team4', pB1: 'player_27', pB2: 'player_30', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 64, teamA: 'team2', pA1: 'player_11', pA2: 'player_12', teamB: 'team4', pB1: 'player_28', pB2: 'player_29', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 65, teamA: 'team3', pA1: 'player_17', pA2: 'player_24', teamB: 'team4', pB1: 'player_25', pB2: 'player_31', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 66, teamA: 'team3', pA1: 'player_18', pA2: 'player_23', teamB: 'team4', pB1: 'player_32', pB2: 'player_30', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 67, teamA: 'team3', pA1: 'player_19', pA2: 'player_22', teamB: 'team4', pB1: 'player_26', pB2: 'player_29', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 68, teamA: 'team3', pA1: 'player_20', pA2: 'player_21', teamB: 'team4', pB1: 'player_27', pB2: 'player_28', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 69, teamA: 'team1', pA1: 'player_1', pA2: 'player_7', teamB: 'team3', pB1: 'player_17', pB2: 'player_23', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 70, teamA: 'team1', pA1: 'player_8', pA2: 'player_6', teamB: 'team3', pB1: 'player_24', pB2: 'player_22', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 71, teamA: 'team1', pA1: 'player_2', pA2: 'player_5', teamB: 'team3', pB1: 'player_18', pB2: 'player_21', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 72, teamA: 'team1', pA1: 'player_3', pA2: 'player_4', teamB: 'team3', pB1: 'player_19', pB2: 'player_20', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 73, teamA: 'team2', pA1: 'player_9', pA2: 'player_14', teamB: 'team3', pB1: 'player_17', pB2: 'player_22', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 74, teamA: 'team2', pA1: 'player_15', pA2: 'player_13', teamB: 'team3', pB1: 'player_23', pB2: 'player_21', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 75, teamA: 'team2', pA1: 'player_16', pA2: 'player_12', teamB: 'team3', pB1: 'player_24', pB2: 'player_20', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 76, teamA: 'team2', pA1: 'player_10', pA2: 'player_11', teamB: 'team3', pB1: 'player_18', pB2: 'player_19', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 77, teamA: 'team1', pA1: 'player_1', pA2: 'player_6', teamB: 'team3', pB1: 'player_17', pB2: 'player_21', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 78, teamA: 'team1', pA1: 'player_7', pA2: 'player_5', teamB: 'team3', pB1: 'player_22', pB2: 'player_20', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 79, teamA: 'team1', pA1: 'player_8', pA2: 'player_4', teamB: 'team3', pB1: 'player_23', pB2: 'player_19', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 80, teamA: 'team1', pA1: 'player_2', pA2: 'player_3', teamB: 'team3', pB1: 'player_24', pB2: 'player_18', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 81, teamA: 'team1', pA1: 'player_1', pA2: 'player_5', teamB: 'team4', pB1: 'player_25', pB2: 'player_30', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 82, teamA: 'team1', pA1: 'player_6', pA2: 'player_4', teamB: 'team4', pB1: 'player_31', pB2: 'player_29', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 83, teamA: 'team1', pA1: 'player_7', pA2: 'player_3', teamB: 'team4', pB1: 'player_32', pB2: 'player_28', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 84, teamA: 'team1', pA1: 'player_8', pA2: 'player_2', teamB: 'team4', pB1: 'player_26', pB2: 'player_27', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 85, teamA: 'team3', pA1: 'player_17', pA2: 'player_20', teamB: 'team4', pB1: 'player_25', pB2: 'player_29', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 86, teamA: 'team3', pA1: 'player_21', pA2: 'player_19', teamB: 'team4', pB1: 'player_30', pB2: 'player_28', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 87, teamA: 'team3', pA1: 'player_22', pA2: 'player_18', teamB: 'team4', pB1: 'player_31', pB2: 'player_27', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 88, teamA: 'team3', pA1: 'player_23', pA2: 'player_24', teamB: 'team4', pB1: 'player_32', pB2: 'player_26', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 89, teamA: 'team1', pA1: 'player_1', pA2: 'player_4', teamB: 'team2', pB1: 'player_9', pB2: 'player_13', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 90, teamA: 'team1', pA1: 'player_5', pA2: 'player_3', teamB: 'team2', pB1: 'player_14', pB2: 'player_12', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 91, teamA: 'team1', pA1: 'player_6', pA2: 'player_2', teamB: 'team2', pB1: 'player_15', pB2: 'player_11', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 92, teamA: 'team1', pA1: 'player_7', pA2: 'player_8', teamB: 'team2', pB1: 'player_16', pB2: 'player_10', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 93, teamA: 'team2', pA1: 'player_9', pA2: 'player_12', teamB: 'team4', pB1: 'player_25', pB2: 'player_28', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 94, teamA: 'team2', pA1: 'player_13', pA2: 'player_11', teamB: 'team4', pB1: 'player_29', pB2: 'player_27', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 95, teamA: 'team2', pA1: 'player_14', pA2: 'player_10', teamB: 'team4', pB1: 'player_30', pB2: 'player_26', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
+  { id: 96, teamA: 'team2', pA1: 'player_15', pA2: 'player_16', teamB: 'team4', pB1: 'player_31', pB2: 'player_32', winner: null, score: '', isFlex: false, scheduledDate: null, reportedDate: null, reportedBy: null, reportedById: null, history: [] },
 ];
 
 const LEAGUE_RULES = {
   totalGames: 96,
   flexLimit: 10
+};
+
+// --- Players Context ---
+
+const PlayersContext = createContext(null);
+
+export const usePlayers = () => {
+  const context = useContext(PlayersContext);
+  if (!context) {
+    throw new Error('usePlayers must be used within PlayersProvider');
+  }
+  return context;
+};
+
+const PlayersProvider = ({ children, user }) => {
+  const [players, setPlayers] = useState(INITIAL_PLAYERS);
+  const playersInitialized = useRef(false);
+
+  // Real-time Players Sync
+  useEffect(() => {
+    if (!user) return;
+
+    const playersRef = collection(db, 'artifacts', appId, 'public', 'data', 'players');
+
+    const unsubscribe = onSnapshot(playersRef, async (snapshot) => {
+      // Auto-Seed Players if empty
+      if (snapshot.empty && !playersInitialized.current) {
+        playersInitialized.current = true;
+        // Batch write the initial players
+        const batch = writeBatch(db);
+        Object.values(INITIAL_PLAYERS).forEach(player => {
+          const ref = doc(db, 'artifacts', appId, 'public', 'data', 'players', player.id);
+          batch.set(ref, player);
+        });
+        await batch.commit();
+        return;
+      }
+
+      // Load players from Firestore
+      const loadedPlayers = {};
+      snapshot.docs.forEach(doc => {
+        const data = doc.data();
+        loadedPlayers[data.id] = data;
+      });
+      setPlayers(loadedPlayers);
+    }, (error) => {
+      console.error("Players sync error:", error);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const updatePlayer = async (playerId, newName) => {
+    if (!user) return;
+    try {
+      const playerRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', playerId);
+      await setDoc(playerRef, { id: playerId, name: newName }, { merge: true });
+    } catch (e) {
+      console.error("Error updating player:", e);
+    }
+  };
+
+  const getPlayerName = (playerId, full = false) => {
+    const fullName = players[playerId]?.name || playerId;
+
+    if (full) return fullName;
+
+    // Return abbreviated by default (e.g., "Azeem Muhammad" -> "Azeem M.")
+    const parts = fullName.split(' ');
+    if (parts.length >= 2) {
+      const firstName = parts[0];
+      const lastInitial = parts[parts.length - 1][0];
+      return `${firstName} ${lastInitial}.`;
+    }
+    return fullName;
+  };
+
+  const value = {
+    players,
+    updatePlayer,
+    getPlayerName
+  };
+
+  return (
+    <PlayersContext.Provider value={value}>
+      {children}
+    </PlayersContext.Provider>
+  );
 };
 
 // --- Components ---
@@ -459,27 +587,28 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-lime-400 selection:text-slate-900 pb-20 md:pb-0">
-      {editingMatch && (
-        <ReportModal
-          match={editingMatch}
-          teams={INITIAL_TEAMS}
-          user={user}
-          playerName={playerName}
-          onClose={() => setEditingMatch(null)}
-          onSave={(id, data) => {
-            updateMatch(id, data);
-            setEditingMatch(null);
-          }}
-        />
-      )}
+    <PlayersProvider user={user}>
+      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-lime-400 selection:text-slate-900 pb-20 md:pb-0">
+        {editingMatch && (
+          <ReportModal
+            match={editingMatch}
+            teams={INITIAL_TEAMS}
+            user={user}
+            playerName={playerName}
+            onClose={() => setEditingMatch(null)}
+            onSave={(id, data) => {
+              updateMatch(id, data);
+              setEditingMatch(null);
+            }}
+          />
+        )}
 
-      {showPlayerIdentification && (
-        <PlayerIdentificationModal
-          teams={INITIAL_TEAMS}
-          onIdentify={handlePlayerIdentify}
-        />
-      )}
+        {showPlayerIdentification && (
+          <PlayerIdentificationModal
+            teams={INITIAL_TEAMS}
+            onIdentify={handlePlayerIdentify}
+          />
+        )}
 
       {showAppInfo && (
         <AppInfoModal onClose={() => setShowAppInfo(false)} />
@@ -606,6 +735,7 @@ export default function App() {
         <MobileNavBtn active={activeTab === 'rules'} onClick={() => setActiveTab('rules')} icon={<Medal size={20} />} label="Playoffs" />
       </nav>
     </div>
+    </PlayersProvider>
   );
 }
 
@@ -638,6 +768,8 @@ const MobileNavBtn = ({ active, onClick, icon, label }) => (
 // --- DASHBOARD ---
 
 const Dashboard = ({ standings, matches, teams, onMatchClick }) => {
+  const { getPlayerName } = usePlayers();
+
   // Sort upcoming matches by date (matches with dates first, then by date, then by ID)
   const upcomingMatches = matches
     .filter(m => !m.winner)
@@ -694,26 +826,55 @@ const Dashboard = ({ standings, matches, teams, onMatchClick }) => {
     return `${dateOnlyStr} at ${timeStr}`;
   };
 
-  // Calculate top team
-  const topTeam = standings.length > 0 ? standings[0] : null;
+  // Calculate top team (only if games have been played)
+  const topTeam = standings.length > 0 && standings[0].played > 0 ? standings[0] : null;
 
   return (
     <div className="space-y-6">
-      {/* Hero Section */}
+      {/* Hero Section with Team Logos */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 p-6 md:p-10 shadow-2xl">
         <div className="absolute top-0 right-0 p-32 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
         <div className="relative z-10">
-          <div className="flex justify-between items-start">
-            <div>
-              <Badge className="bg-white/20 text-white backdrop-blur-sm mb-3 inline-block">Current Leader</Badge>
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="text-center md:text-left">
+              <Badge className="bg-white/20 text-white backdrop-blur-sm mb-3 inline-block">{topTeam ? 'Current Leader' : 'League 2026'}</Badge>
               <h2 className="text-3xl md:text-5xl font-black text-white mb-1">
-                {topTeam ? topTeam.name : 'Season Start'}
+                {topTeam ? topTeam.name : 'Pickle2Fit League'}
               </h2>
               <p className="text-white/80 font-medium">
-                {topTeam ? `${topTeam.wins} Wins • ${(topTeam.wins / (topTeam.played || 1) * 100).toFixed(0)}% WR` : 'Ready for the first serve!'}
+                {topTeam ? `${topTeam.wins} Wins • ${(topTeam.wins / (topTeam.played || 1) * 100).toFixed(0)}% WR` : '4 Teams Battle for Glory'}
               </p>
             </div>
-            {topTeam && <Crown className="w-16 h-16 text-yellow-300 drop-shadow-lg opacity-80" />}
+
+            {/* Team Logos Grid */}
+            <div className="grid grid-cols-4 gap-3 md:gap-4">
+              {teams.map(team => (
+                <div
+                  key={team.id}
+                  className={`relative group ${team.id === topTeam?.id && topTeam?.played > 0 ? 'scale-110' : ''}`}
+                  title={team.name}
+                >
+                  {team.logo && (
+                    <>
+                      <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl bg-white p-2 shadow-lg transition-all duration-300 group-hover:scale-110 group-hover:shadow-xl">
+                        <img
+                          src={team.logo}
+                          alt={team.name}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                      {team.id === topTeam?.id && topTeam?.played > 0 && (
+                        <div className="absolute -top-2 -right-2 animate-bounce">
+                          <div className="bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-full p-1.5 shadow-lg ring-2 ring-yellow-300/50">
+                            <Crown className="w-4 h-4 text-yellow-900" fill="currentColor" />
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -782,8 +943,18 @@ const Dashboard = ({ standings, matches, teams, onMatchClick }) => {
                         <span className="font-semibold text-sm text-right">{getTeamName(m.teamB)}</span>
                       </div>
                       <div className="flex justify-between text-xs text-slate-500">
-                         <span className="truncate w-24">{m.pA1}/{m.pA2}</span>
-                         <span className="truncate w-24 text-right">{m.pB1}/{m.pB2}</span>
+                         <span
+                           className="truncate w-24"
+                           title={`${getPlayerName(m.pA1)} / ${getPlayerName(m.pA2, true)}`}
+                         >
+                           {getPlayerName(m.pA1)}/{getPlayerName(m.pA2)}
+                         </span>
+                         <span
+                           className="truncate w-24 text-right"
+                           title={`${getPlayerName(m.pB1)} / ${getPlayerName(m.pB2, true)}`}
+                         >
+                           {getPlayerName(m.pB1)}/{getPlayerName(m.pB2)}
+                         </span>
                       </div>
                    </div>
                  </div>
@@ -848,6 +1019,7 @@ const Dashboard = ({ standings, matches, teams, onMatchClick }) => {
 // --- MATCH SCHEDULE & REPORTING ---
 
 const MatchSchedule = ({ matches, updateMatch, teams, user, playerName }) => {
+  const { getPlayerName } = usePlayers();
   const [filterTeam, setFilterTeam] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAutocomplete, setShowAutocomplete] = useState(false);
@@ -870,11 +1042,11 @@ const MatchSchedule = ({ matches, updateMatch, teams, user, playerName }) => {
   const allPlayers = useMemo(() => {
     if (filterTeam === 'All') {
       // Get all players from all teams
-      return [...new Set(teams.flatMap(t => t.players))].sort();
+      return [...new Set(teams.flatMap(t => t.players))];
     } else {
       // Get players only from selected team
       const team = teams.find(t => t.id === filterTeam);
-      return team ? [...team.players].sort() : [];
+      return team ? [...team.players] : [];
     }
   }, [teams, filterTeam]);
 
@@ -882,8 +1054,10 @@ const MatchSchedule = ({ matches, updateMatch, teams, user, playerName }) => {
   const filteredPlayers = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const query = searchQuery.toLowerCase();
-    return allPlayers.filter(p => p.toLowerCase().includes(query)).slice(0, 8);
-  }, [allPlayers, searchQuery]);
+    return allPlayers
+      .filter(playerId => getPlayerName(playerId).toLowerCase().includes(query))
+      .slice(0, 8);
+  }, [allPlayers, searchQuery, getPlayerName]);
 
   // Filter and sort matches by team and/or player
   const filteredMatches = matches
@@ -895,10 +1069,10 @@ const MatchSchedule = ({ matches, updateMatch, teams, user, playerName }) => {
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const playerMatch =
-          m.pA1.toLowerCase().includes(query) ||
-          m.pA2.toLowerCase().includes(query) ||
-          m.pB1.toLowerCase().includes(query) ||
-          m.pB2.toLowerCase().includes(query);
+          getPlayerName(m.pA1).toLowerCase().includes(query) ||
+          getPlayerName(m.pA2).toLowerCase().includes(query) ||
+          getPlayerName(m.pB1).toLowerCase().includes(query) ||
+          getPlayerName(m.pB2).toLowerCase().includes(query);
         return teamMatch && playerMatch;
       }
 
@@ -1043,15 +1217,16 @@ const MatchSchedule = ({ matches, updateMatch, teams, user, playerName }) => {
         {showAutocomplete && filteredPlayers.length > 0 && (
           <div className="absolute top-full mt-2 w-full bg-slate-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden z-10 animate-in fade-in slide-in-from-top-2 duration-200">
             <div className="max-h-64 overflow-y-auto">
-              {filteredPlayers.map((player, idx) => {
+              {filteredPlayers.map((playerId, idx) => {
+                const playerName = getPlayerName(playerId);
                 const query = searchQuery.toLowerCase();
-                const playerLower = player.toLowerCase();
+                const playerLower = playerName.toLowerCase();
                 const matchIndex = playerLower.indexOf(query);
 
                 return (
                   <button
-                    key={player}
-                    onClick={() => handlePlayerSelect(player)}
+                    key={playerId}
+                    onClick={() => handlePlayerSelect(playerName)}
                     onMouseEnter={() => setSelectedIndex(idx)}
                     className={`w-full px-4 py-3 text-left text-sm text-white transition-colors flex items-center gap-3 ${
                       idx === selectedIndex
@@ -1063,14 +1238,14 @@ const MatchSchedule = ({ matches, updateMatch, teams, user, playerName }) => {
                     <span className={`font-medium ${idx === selectedIndex ? 'text-lime-200' : ''}`}>
                       {matchIndex >= 0 ? (
                         <>
-                          {player.substring(0, matchIndex)}
+                          {playerName.substring(0, matchIndex)}
                           <span className="bg-lime-400/30 text-lime-100 px-0.5 rounded">
-                            {player.substring(matchIndex, matchIndex + query.length)}
+                            {playerName.substring(matchIndex, matchIndex + query.length)}
                           </span>
-                          {player.substring(matchIndex + query.length)}
+                          {playerName.substring(matchIndex + query.length)}
                         </>
                       ) : (
-                        player
+                        playerName
                       )}
                     </span>
                     {filterTeam !== 'All' && (
@@ -1143,6 +1318,7 @@ const MatchSchedule = ({ matches, updateMatch, teams, user, playerName }) => {
 };
 
 const MatchCard = ({ match, teams, searchQuery = '', onEdit }) => {
+  const { getPlayerName } = usePlayers();
   const isPlayed = !!match.winner;
   const teamAData = teams.find(t => t.id === match.teamA);
   const teamBData = teams.find(t => t.id === match.teamB);
@@ -1240,8 +1416,8 @@ const MatchCard = ({ match, teams, searchQuery = '', onEdit }) => {
             {teamAData?.name || match.teamA}
           </div>
           <div className="text-xs text-slate-400 flex flex-col mt-1">
-            <span>{highlightText(match.pA1)}</span>
-            <span>{highlightText(match.pA2)}</span>
+            <span>{highlightText(getPlayerName(match.pA1))}</span>
+            <span>{highlightText(getPlayerName(match.pA2))}</span>
           </div>
           {match.isFlexA && <span className="text-[10px] text-pink-400 border border-pink-500/30 px-1 rounded mt-1 inline-block">Flex Used</span>}
         </div>
@@ -1265,8 +1441,8 @@ const MatchCard = ({ match, teams, searchQuery = '', onEdit }) => {
             {teamBData?.name || match.teamB}
           </div>
           <div className="text-xs text-slate-400 flex flex-col items-end mt-1">
-            <span>{highlightText(match.pB1)}</span>
-            <span>{highlightText(match.pB2)}</span>
+            <span>{highlightText(getPlayerName(match.pB1))}</span>
+            <span>{highlightText(getPlayerName(match.pB2))}</span>
           </div>
           {match.isFlexB && <span className="text-[10px] text-pink-400 border border-pink-500/30 px-1 rounded mt-1 inline-block">Flex Used</span>}
         </div>
@@ -1482,20 +1658,21 @@ const AppInfoModal = ({ onClose }) => {
 
 // Player Identification Modal with Autocomplete
 const PlayerIdentificationModal = ({ teams, onIdentify }) => {
+  const { getPlayerName } = usePlayers();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(-1);
 
   // Get all unique players from all teams
   const allPlayers = useMemo(() => {
-    return [...new Set(teams.flatMap(t => t.players))].sort();
+    return [...new Set(teams.flatMap(t => t.players))];
   }, [teams]);
 
   // Filter players based on search query
   const filteredPlayers = useMemo(() => {
     if (!searchQuery.trim()) return allPlayers.slice(0, 10); // Show first 10 if no query
     const query = searchQuery.toLowerCase();
-    return allPlayers.filter(p => p.toLowerCase().includes(query)).slice(0, 10);
-  }, [allPlayers, searchQuery]);
+    return allPlayers.filter(playerId => getPlayerName(playerId).toLowerCase().includes(query)).slice(0, 10);
+  }, [allPlayers, searchQuery, getPlayerName]);
 
   const handlePlayerSelect = (player) => {
     onIdentify(player);
@@ -1553,15 +1730,16 @@ const PlayerIdentificationModal = ({ teams, onIdentify }) => {
           {/* Player List */}
           <div className="max-h-80 overflow-y-auto bg-slate-800/30 rounded-xl border border-white/5">
             {filteredPlayers.length > 0 ? (
-              filteredPlayers.map((player, idx) => {
+              filteredPlayers.map((playerId, idx) => {
+                const playerName = getPlayerName(playerId);
                 const query = searchQuery.toLowerCase();
-                const playerLower = player.toLowerCase();
+                const playerLower = playerName.toLowerCase();
                 const matchIndex = query ? playerLower.indexOf(query) : -1;
 
                 return (
                   <button
-                    key={player}
-                    onClick={() => handlePlayerSelect(player)}
+                    key={playerId}
+                    onClick={() => handlePlayerSelect(playerName)}
                     onMouseEnter={() => setSelectedIndex(idx)}
                     className={`w-full px-4 py-3 text-left text-sm text-white transition-all flex items-center gap-3 ${
                       idx === selectedIndex
@@ -1573,14 +1751,14 @@ const PlayerIdentificationModal = ({ teams, onIdentify }) => {
                     <span className={`font-medium ${idx === selectedIndex ? 'text-lime-200' : ''}`}>
                       {matchIndex >= 0 ? (
                         <>
-                          {player.substring(0, matchIndex)}
+                          {playerName.substring(0, matchIndex)}
                           <span className="bg-lime-400/30 text-lime-100 px-0.5 rounded">
-                            {player.substring(matchIndex, matchIndex + query.length)}
+                            {playerName.substring(matchIndex, matchIndex + query.length)}
                           </span>
-                          {player.substring(matchIndex + query.length)}
+                          {playerName.substring(matchIndex + query.length)}
                         </>
                       ) : (
-                        player
+                        playerName
                       )}
                     </span>
                   </button>
@@ -1600,6 +1778,7 @@ const PlayerIdentificationModal = ({ teams, onIdentify }) => {
 };
 
 const ReportModal = ({ match, onClose, onSave, teams, user, playerName }) => {
+  const { getPlayerName } = usePlayers();
   const [scoreA, setScoreA] = useState('');
   const [scoreB, setScoreB] = useState('');
   const [winner, setWinner] = useState(match.winner || match.teamA);
@@ -1828,63 +2007,6 @@ const ReportModal = ({ match, onClose, onSave, teams, user, playerName }) => {
               </div>
             )}
 
-            {/* History Toggle */}
-            {match.history && match.history.length > 0 && (
-              <div className="space-y-3">
-                <button
-                  onClick={() => setShowHistory(!showHistory)}
-                  className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-white/5 transition-colors group"
-                >
-                  <div className="flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-slate-400 group-hover:text-slate-300" />
-                    <span className="text-sm font-medium text-slate-300">{showHistory ? 'Hide' : 'Show'} Change History</span>
-                    <span className="text-xs bg-slate-700 text-slate-400 px-2 py-0.5 rounded-full">{match.history.length}</span>
-                  </div>
-                  <ChevronRight className={`w-4 h-4 text-slate-500 transition-transform ${showHistory ? 'rotate-90' : ''}`} />
-                </button>
-
-                {showHistory && (
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {match.history.map((entry, idx) => (
-                      <div key={idx} className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center">
-                              <Users className="w-3 h-3 text-purple-400" />
-                            </div>
-                            <div className="group relative inline-block">
-                              <span className="text-sm font-medium text-white cursor-help">{entry.userName || 'Unknown'}</span>
-                              {entry.userId && (
-                                <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block z-10 whitespace-nowrap pointer-events-none">
-                                  <div className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 shadow-xl">
-                                    <div className="text-[10px] text-slate-400 mb-0.5">User ID</div>
-                                    <div className="text-xs font-mono text-white">{entry.userId}</div>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <span className="text-xs text-slate-500">{formatHistoryDate(entry.timestamp)}</span>
-                        </div>
-                        <div className="space-y-1.5 pl-8">
-                          {Object.entries(entry.changes).map(([key, value]) => (
-                            <div key={key} className="text-xs">
-                              <span className="text-slate-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <span className="text-red-400/70 line-through">{value.from}</span>
-                                <span className="text-slate-600">→</span>
-                                <span className="text-lime-400 font-medium">{value.to}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* Scheduled Date & Time */}
             <div className="space-y-2">
               <label className="text-[10px] uppercase tracking-wide text-slate-400 font-bold flex items-center gap-2">
@@ -1942,13 +2064,13 @@ const ReportModal = ({ match, onClose, onSave, teams, user, playerName }) => {
                 <div className="space-y-1.5">
                   <label className="text-[10px] uppercase text-slate-500 font-medium">Player 1</label>
                   <select className="w-full bg-slate-700/50 border border-slate-600 rounded-lg p-3 text-sm text-white focus:border-lime-500 focus:ring-2 focus:ring-lime-500/20 outline-none transition-all" value={pA1} onChange={e => setPA1(e.target.value)}>
-                    {teamAData?.players.map(p => <option key={p} value={p}>{p}</option>)}
+                    {teamAData?.players.map(p => <option key={p} value={p}>{getPlayerName(p, true)}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] uppercase text-slate-500 font-medium">Player 2</label>
                   <select className="w-full bg-slate-700/50 border border-slate-600 rounded-lg p-3 text-sm text-white focus:border-lime-500 focus:ring-2 focus:ring-lime-500/20 outline-none transition-all" value={pA2} onChange={e => setPA2(e.target.value)}>
-                    {teamAData?.players.map(p => <option key={p} value={p}>{p}</option>)}
+                    {teamAData?.players.map(p => <option key={p} value={p}>{getPlayerName(p, true)}</option>)}
                   </select>
                 </div>
               </div>
@@ -1985,13 +2107,13 @@ const ReportModal = ({ match, onClose, onSave, teams, user, playerName }) => {
                 <div className="space-y-1.5">
                   <label className="text-[10px] uppercase text-slate-500 font-medium">Player 1</label>
                   <select className="w-full bg-slate-700/50 border border-slate-600 rounded-lg p-3 text-sm text-white focus:border-lime-500 focus:ring-2 focus:ring-lime-500/20 outline-none transition-all" value={pB1} onChange={e => setPB1(e.target.value)}>
-                    {teamBData?.players.map(p => <option key={p} value={p}>{p}</option>)}
+                    {teamBData?.players.map(p => <option key={p} value={p}>{getPlayerName(p, true)}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] uppercase text-slate-500 font-medium">Player 2</label>
                   <select className="w-full bg-slate-700/50 border border-slate-600 rounded-lg p-3 text-sm text-white focus:border-lime-500 focus:ring-2 focus:ring-lime-500/20 outline-none transition-all" value={pB2} onChange={e => setPB2(e.target.value)}>
-                    {teamBData?.players.map(p => <option key={p} value={p}>{p}</option>)}
+                    {teamBData?.players.map(p => <option key={p} value={p}>{getPlayerName(p, true)}</option>)}
                   </select>
                 </div>
               </div>
@@ -2008,6 +2130,84 @@ const ReportModal = ({ match, onClose, onSave, teams, user, playerName }) => {
               </div>
             </div>
               </>
+            )}
+
+            {/* History Toggle - Moved to bottom */}
+            {match.history && match.history.length > 0 && (
+              <div className="space-y-3">
+                <button
+                  onClick={() => setShowHistory(!showHistory)}
+                  className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-white/5 transition-colors group"
+                >
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-slate-400 group-hover:text-slate-300" />
+                    <span className="text-sm font-medium text-slate-300">{showHistory ? 'Hide' : 'Show'} Change History</span>
+                    <span className="text-xs bg-slate-700 text-slate-400 px-2 py-0.5 rounded-full">{match.history.length}</span>
+                  </div>
+                  <ChevronRight className={`w-4 h-4 text-slate-500 transition-transform ${showHistory ? 'rotate-90' : ''}`} />
+                </button>
+
+                {showHistory && (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {[...match.history].reverse().map((entry, idx) => (
+                      <div key={idx} className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center">
+                              <Users className="w-3 h-3 text-purple-400" />
+                            </div>
+                            <div className="group relative inline-block">
+                              <span className="text-sm font-medium text-white cursor-help">{entry.userName || 'Unknown'}</span>
+                              {entry.userId && (
+                                <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block z-10 whitespace-nowrap pointer-events-none">
+                                  <div className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 shadow-xl">
+                                    <div className="text-[10px] text-slate-400 mb-0.5">User ID</div>
+                                    <div className="text-xs font-mono text-white">{entry.userId}</div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <span className="text-xs text-slate-500">{formatDate(entry.timestamp)}</span>
+                        </div>
+                        <div className="space-y-1.5 pl-8">
+                          {Object.entries(entry.changes).map(([key, value]) => {
+                            // Convert team IDs to team names
+                            let fromValue = value.from;
+                            let toValue = value.to;
+
+                            if (key === 'winner' && fromValue !== 'Not set' && fromValue !== 'Cleared') {
+                              const fromTeam = teams.find(t => t.id === fromValue);
+                              fromValue = fromTeam?.name || fromValue;
+                            }
+                            if (key === 'winner' && toValue !== 'Not set' && toValue !== 'Cleared') {
+                              const toTeam = teams.find(t => t.id === toValue);
+                              toValue = toTeam?.name || toValue;
+                            }
+
+                            // Format scheduled date if present
+                            if (key === 'scheduledDate') {
+                              fromValue = fromValue ? formatDate(fromValue) : 'Not set';
+                              toValue = toValue ? formatDate(toValue) : 'Not set';
+                            }
+
+                            return (
+                              <div key={key} className="text-xs">
+                                <span className="text-slate-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-red-400/70 line-through">{fromValue}</span>
+                                  <span className="text-slate-600">→</span>
+                                  <span className="text-lime-400 font-medium">{toValue}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -2044,42 +2244,156 @@ const ReportModal = ({ match, onClose, onSave, teams, user, playerName }) => {
 
 // --- TEAMS ---
 
-const TeamsList = ({ teams }) => (
-  <div className="grid gap-6">
-    {teams.map(team => (
-      <div key={team.id} className="relative overflow-hidden rounded-2xl bg-slate-800/60 border border-white/5 shadow-xl">
-        <div className={`absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b ${team.color}`} />
-        <div className="p-5">
-           <div className="flex items-center justify-between mb-4">
-             <h3 className="text-2xl font-black text-white">{team.name}</h3>
-             <Users className="text-slate-600" size={24} />
-           </div>
-           
-           <div className="space-y-4">
-              <div className="bg-slate-900/50 rounded-xl p-3 flex items-center gap-3 border border-white/5">
-                <div className="bg-yellow-500/20 p-2 rounded-full">
-                  <Crown size={18} className="text-yellow-400" />
+const EditTeamModal = ({ team, onClose }) => {
+  const { players, updatePlayer } = usePlayers();
+  const [editedPlayers, setEditedPlayers] = useState({});
+
+  const handlePlayerNameChange = (playerId, newName) => {
+    setEditedPlayers(prev => ({ ...prev, [playerId]: newName }));
+  };
+
+  const handleSave = async () => {
+    // Update all edited players
+    for (const [playerId, newName] of Object.entries(editedPlayers)) {
+      if (newName.trim() && newName !== players[playerId]?.name) {
+        await updatePlayer(playerId, newName.trim());
+      }
+    }
+    onClose();
+  };
+
+  const getPlayerName = (playerId) => {
+    return editedPlayers[playerId] !== undefined
+      ? editedPlayers[playerId]
+      : players[playerId]?.name || playerId;
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-800 rounded-2xl border border-white/10 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="p-6 border-b border-slate-700">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-black text-white flex items-center gap-2">
+              <Edit3 size={24} className="text-lime-400" />
+              Edit {team.name}
+            </h2>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+            >
+              <X size={20} className="text-slate-400" />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6 overflow-y-auto flex-1">
+          <div className="space-y-4">
+            {team.players.map(playerId => (
+              <div key={playerId} className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-2">
+                  {playerId === team.captain && <Crown size={14} className="text-yellow-400" />}
+                  {playerId === team.captain ? 'Captain' : 'Player'}
+                </label>
+                <input
+                  type="text"
+                  value={getPlayerName(playerId)}
+                  onChange={(e) => handlePlayerNameChange(playerId, e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-transparent transition-all"
+                  placeholder="Player name"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-4 border-t border-slate-700 bg-slate-900/50 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 px-6 py-3 rounded-xl text-sm font-semibold text-slate-300 bg-slate-800 hover:bg-slate-750 border border-slate-700 transition-all active:scale-95"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="flex-1 bg-gradient-to-r from-lime-500 to-green-500 hover:from-lime-400 hover:to-green-400 text-slate-900 px-6 py-3 rounded-xl text-sm font-bold shadow-lg shadow-lime-500/20 transition-all active:scale-95"
+          >
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const TeamsList = ({ teams }) => {
+  const { getPlayerName } = usePlayers();
+  const [editingTeam, setEditingTeam] = useState(null);
+
+  return (
+    <>
+      {editingTeam && (
+        <EditTeamModal
+          team={editingTeam}
+          onClose={() => setEditingTeam(null)}
+        />
+      )}
+      <div className="grid gap-6">
+        {teams.map(team => (
+          <div key={team.id} className="relative overflow-hidden rounded-2xl bg-slate-800/60 border border-white/5 shadow-xl">
+            <div className={`absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b ${team.color}`} />
+            <div className="p-5">
+              <div className="flex items-center gap-4 mb-4">
+                {team.logo && (
+                  <div className="flex-shrink-0">
+                    <img
+                      src={team.logo}
+                      alt={`${team.name} logo`}
+                      className="w-20 h-20 object-contain rounded-xl bg-white/5 p-2"
+                    />
+                  </div>
+                )}
+                <div className="flex-1">
+                  <h3 className="text-2xl font-black text-white">{team.name}</h3>
+                  <p className="text-xs text-slate-400 mt-1">{team.players.length} Players</p>
                 </div>
-                <div>
-                  <div className="text-[10px] uppercase font-bold text-slate-500">Captain</div>
-                  <div className="font-bold text-slate-200">{team.captain}</div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setEditingTeam(team)}
+                    className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors group"
+                    title="Edit team players"
+                  >
+                    <Edit3 size={18} className="text-slate-500 group-hover:text-lime-400 transition-colors" />
+                  </button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                {team.players.filter(p => p !== team.captain).map(player => (
-                  <div key={player} className="bg-slate-700/30 p-2 rounded-lg text-sm text-slate-300 flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-                    {player}
+              <div className="space-y-4">
+                <div className="bg-slate-900/50 rounded-xl p-3 flex items-center gap-3 border border-white/5">
+                  <div className="bg-yellow-500/20 p-2 rounded-full">
+                    <Crown size={18} className="text-yellow-400" />
                   </div>
-                ))}
+                  <div>
+                    <div className="text-[10px] uppercase font-bold text-slate-500">Captain</div>
+                    <div className="font-bold text-slate-200">{getPlayerName(team.captain)}</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {team.players.filter(p => p !== team.captain).map(playerId => (
+                    <div key={playerId} className="bg-slate-700/30 p-2 rounded-lg text-sm text-slate-300 flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                      {getPlayerName(playerId)}
+                    </div>
+                  ))}
+                </div>
               </div>
-           </div>
-        </div>
+            </div>
+          </div>
+        ))}
       </div>
-    ))}
-  </div>
-);
+    </>
+  );
+};
 
 // --- RULES & PLAYOFFS ---
 
