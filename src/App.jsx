@@ -998,12 +998,6 @@ const Dashboard = ({ standings, matches, teams, onMatchClick, onViewAllMatches }
                 <div className="flex items-start gap-3">
                   <div className="text-xs text-slate-500 font-mono">#{m.id}</div>
                   <div className="flex-1 space-y-1">
-                    {m.reportedDate && (
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-3 h-3 text-slate-500" />
-                        <span className="text-xs text-slate-500">{formatDate(m.reportedDate)}</span>
-                      </div>
-                    )}
                     <div className="flex justify-between items-center gap-2">
                       <div className="flex-1">
                         <div className={`font-semibold text-sm ${m.winner === m.teamA ? 'text-lime-400' : 'text-slate-400'}`}>
@@ -1020,6 +1014,11 @@ const Dashboard = ({ standings, matches, teams, onMatchClick, onViewAllMatches }
                             {m.games.filter(g => g.scoreA && g.scoreB).map((game, i) => (
                               <span key={i}>{game.scoreA}-{game.scoreB}</span>
                             ))}
+                          </div>
+                        )}
+                        {m.reportedDate && (
+                          <div className="text-[9px] text-slate-600 mt-0.5">
+                            {formatDate(m.reportedDate)}
                           </div>
                         )}
                       </div>
