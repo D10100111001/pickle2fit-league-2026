@@ -1,21 +1,26 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { 
-  Trophy, 
-  Calendar, 
-  Users, 
-  Activity, 
-  Filter, 
-  Search, 
-  ChevronRight, 
-  Edit3, 
-  Save, 
+import {
+  Trophy,
+  Calendar,
+  Users,
+  Activity,
+  Filter,
+  Search,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Edit3,
+  Save,
   X,
   Crown,
   Medal,
   Zap,
   Wifi,
   WifiOff,
-  Loader2
+  Loader2,
+  Info,
+  Sparkles,
+  Trash2
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import {
@@ -222,6 +227,8 @@ export default function App() {
   const [editingMatch, setEditingMatch] = useState(null);
   const [showPlayerIdentification, setShowPlayerIdentification] = useState(false);
   const [playerName, setPlayerName] = useState(null);
+  const [imageError, setImageError] = useState(false);
+  const [showAppInfo, setShowAppInfo] = useState(false);
   const initialized = useRef(false);
 
   // --- Auth & Init ---
@@ -280,7 +287,13 @@ export default function App() {
         }
       } catch (err) {
         console.error("Error checking player identification:", err);
-        setShowPlayerIdentification(true);
+        // Use display name as fallback even if Firestore fails
+        if (user.displayName) {
+          setPlayerName(user.displayName);
+          setShowPlayerIdentification(false);
+        } else {
+          setShowPlayerIdentification(true);
+        }
       }
     };
 
@@ -467,27 +480,116 @@ export default function App() {
           onIdentify={handlePlayerIdentify}
         />
       )}
+
+      {showAppInfo && (
+        <AppInfoModal onClose={() => setShowAppInfo(false)} />
+      )}
+
       {/* Mobile-first Header */}
-      <header className="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-md border-b border-white/5 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="bg-gradient-to-tr from-lime-400 to-green-600 p-2 rounded-lg shadow-lg shadow-lime-500/20">
-            <Trophy className="w-5 h-5 text-slate-900" />
+      <header className="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-md border-b border-white/5 px-4 py-3">
+        <div className="flex items-center justify-between gap-4">
+          {/* Logo Section */}
+          <div className="flex items-center gap-2">
+            <div className="bg-gradient-to-tr from-lime-400 to-green-600 p-2 rounded-lg shadow-lg shadow-lime-500/20">
+              <Trophy className="w-5 h-5 text-slate-900" />
+            </div>
+            <div>
+              <h1 className="font-black text-lg tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+                Pickle2Fit
+              </h1>
+              <p className="text-[10px] text-lime-400 font-bold tracking-widest uppercase flex items-center gap-1">
+                {loading ? <Loader2 size={10} className="animate-spin" /> : <Wifi size={10} />}
+                League 2026
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-black text-lg tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
-              Pickle2Fit
-            </h1>
-            <p className="text-[10px] text-lime-400 font-bold tracking-widest uppercase flex items-center gap-1">
-              {loading ? <Loader2 size={10} className="animate-spin" /> : <Wifi size={10} />}
-              League 2026
-            </p>
+
+          {/* Navigation + User Profile */}
+          <div className="flex items-center gap-3">
+            {/* Live Info Badge */}
+            <button
+              onClick={() => setShowAppInfo(true)}
+              className="relative flex items-center gap-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-500/50 rounded-full px-3 py-1.5 transition-all duration-200 group"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+              </span>
+              <Info className="w-4 h-4 text-red-400 group-hover:text-red-300" />
+              <span className="text-xs font-semibold text-red-400 group-hover:text-red-300 hidden sm:inline">
+                LIVE
+              </span>
+            </button>
+
+            <div className="hidden md:flex gap-6 text-sm font-medium">
+              <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<Activity />}>Dashboard</NavBtn>
+              <NavBtn active={activeTab === 'matches'} onClick={() => setActiveTab('matches')} icon={<Calendar />}>Matches</NavBtn>
+              <NavBtn active={activeTab === 'teams'} onClick={() => setActiveTab('teams')} icon={<Users />}>Teams</NavBtn>
+              <NavBtn active={activeTab === 'rules'} onClick={() => setActiveTab('rules')} icon={<Zap />}>Rules</NavBtn>
+            </div>
+
+            {/* User Profile */}
+            {user && (
+              <div className="relative group">
+                <div className="flex items-center gap-2 bg-white/5 hover:bg-white/10 transition-colors rounded-full pl-1 pr-3 py-1 border border-white/10 shrink-0 cursor-pointer">
+                  {user.photoURL && !imageError ? (
+                    <img
+                      src={user.photoURL}
+                      alt={user.displayName || 'User'}
+                      onError={() => setImageError(true)}
+                      className="w-8 h-8 rounded-full ring-2 ring-lime-400/50 object-cover"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-lime-400 to-green-500 flex items-center justify-center text-slate-900 font-bold text-sm ring-2 ring-lime-400/50">
+                      {(user.displayName || user.email || 'U')[0].toUpperCase()}
+                    </div>
+                  )}
+                  <span className="text-sm font-medium text-white hidden md:inline-block max-w-[120px] truncate">
+                    {user.displayName || user.email?.split('@')[0] || 'User'}
+                  </span>
+                </div>
+
+                {/* Tooltip */}
+                <div className="absolute right-0 top-full mt-2 hidden group-hover:block z-50 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <div className="bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-4 min-w-[240px]">
+                    <div className="flex items-center gap-3 mb-3">
+                      {user.photoURL && !imageError ? (
+                        <img
+                          src={user.photoURL}
+                          alt={user.displayName || 'User'}
+                          className="w-12 h-12 rounded-full ring-2 ring-lime-400/50 object-cover"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-lime-400 to-green-500 flex items-center justify-center text-slate-900 font-bold text-lg ring-2 ring-lime-400/50">
+                          {(user.displayName || user.email || 'U')[0].toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-white text-sm truncate">
+                          {user.displayName || 'User'}
+                        </div>
+                        <div className="text-xs text-slate-400 truncate">
+                          {user.email || 'No email'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="pt-3 border-t border-slate-700 space-y-1.5">
+                      <div className="flex items-center gap-2 text-xs">
+                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                        <span className="text-slate-400">Signed in with Google</span>
+                      </div>
+                      {playerName && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <Users className="w-3 h-3 text-lime-400" />
+                          <span className="text-slate-400">Playing as: <span className="text-white font-medium">{playerName}</span></span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-        <div className="hidden md:flex gap-6 text-sm font-medium">
-          <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<Activity />}>Dashboard</NavBtn>
-          <NavBtn active={activeTab === 'matches'} onClick={() => setActiveTab('matches')} icon={<Calendar />}>Matches</NavBtn>
-          <NavBtn active={activeTab === 'teams'} onClick={() => setActiveTab('teams')} icon={<Users />}>Teams</NavBtn>
-          <NavBtn active={activeTab === 'rules'} onClick={() => setActiveTab('rules')} icon={<Zap />}>Rules</NavBtn>
         </div>
       </header>
 
@@ -551,7 +653,7 @@ const Dashboard = ({ standings, matches, teams, onMatchClick }) => {
 
   // Sort recent matches by reported date (most recent first), fallback to ID
   const recentMatches = matches
-    .filter(m => m.winner)
+    .filter(m => m.winner && m.score) // Only show matches with valid results
     .sort((a, b) => {
       if (a.reportedDate && b.reportedDate) {
         return new Date(b.reportedDate) - new Date(a.reportedDate);
@@ -563,7 +665,7 @@ const Dashboard = ({ standings, matches, teams, onMatchClick }) => {
   // Helper to get team name from ID
   const getTeamName = (teamId) => teams.find(t => t.id === teamId)?.name || teamId;
 
-  // Helper to format date
+  // Helper to format date with time in local timezone
   const formatDate = (dateStr) => {
     if (!dateStr) return null;
     const date = new Date(dateStr);
@@ -577,10 +679,19 @@ const Dashboard = ({ standings, matches, teams, onMatchClick }) => {
     const compareDate = new Date(date);
     compareDate.setHours(0, 0, 0, 0);
 
-    if (compareDate.getTime() === today.getTime()) return 'Today';
-    if (compareDate.getTime() === tomorrow.getTime()) return 'Tomorrow';
+    // Format time in local timezone
+    const timeStr = date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: date.getMinutes() !== 0 ? '2-digit' : undefined,
+      hour12: true
+    });
 
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (compareDate.getTime() === today.getTime()) return `Today at ${timeStr}`;
+    if (compareDate.getTime() === tomorrow.getTime()) return `Tomorrow at ${timeStr}`;
+
+    // For other dates, show date and time
+    const dateOnlyStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `${dateOnlyStr} at ${timeStr}`;
   };
 
   // Calculate top team
@@ -1057,7 +1168,7 @@ const MatchCard = ({ match, teams, searchQuery = '', onEdit }) => {
     );
   };
 
-  // Format scheduled date
+  // Format scheduled date with time in local timezone
   const formatDate = (dateStr) => {
     if (!dateStr) return null;
     const date = new Date(dateStr);
@@ -1070,15 +1181,23 @@ const MatchCard = ({ match, teams, searchQuery = '', onEdit }) => {
     const compareDate = new Date(date);
     compareDate.setHours(0, 0, 0, 0);
 
-    if (compareDate.getTime() === today.getTime()) return 'Today';
-    if (compareDate.getTime() === tomorrow.getTime()) return 'Tomorrow';
+    // Format time in local timezone
+    const timeStr = date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: date.getMinutes() !== 0 ? '2-digit' : undefined,
+      hour12: true
+    });
 
-    return date.toLocaleDateString('en-US', {
+    if (compareDate.getTime() === today.getTime()) return `Today at ${timeStr}`;
+    if (compareDate.getTime() === tomorrow.getTime()) return `Tomorrow at ${timeStr}`;
+
+    const dateOnlyStr = date.toLocaleDateString('en-US', {
       weekday: 'short',
       month: 'short',
       day: 'numeric',
       year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
     });
+    return `${dateOnlyStr} at ${timeStr}`;
   };
 
   return (
@@ -1144,6 +1263,205 @@ const MatchCard = ({ match, teams, searchQuery = '', onEdit }) => {
         <button className="bg-lime-500 hover:bg-lime-400 text-slate-900 font-bold py-2 px-6 rounded-full shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-all flex items-center gap-2">
           <Edit3 size={16} /> {isPlayed ? 'View Details' : 'Edit Match'}
         </button>
+      </div>
+    </div>
+  );
+};
+
+// App Info Modal
+const AppInfoModal = ({ onClose }) => {
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-slate-900 border border-slate-700/50 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="p-5 border-b border-slate-700 flex justify-between items-center bg-gradient-to-r from-red-500/10 to-orange-500/10">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className="bg-red-500/20 p-2.5 rounded-xl border border-red-500/30">
+                <Sparkles className="w-6 h-6 text-red-400" />
+              </div>
+              <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+              </span>
+            </div>
+            <div>
+              <h3 className="font-bold text-xl text-white">Live League Dashboard</h3>
+              <p className="text-xs text-slate-400">Real-time pickleball league management</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2.5 hover:bg-white/10 rounded-full transition-colors active:scale-95"
+          >
+            <X size={20} className="text-slate-400" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="overflow-y-auto flex-1 p-6 space-y-6">
+          {/* What is This */}
+          <section>
+            <h4 className="font-bold text-lg text-white mb-3 flex items-center gap-2">
+              <Zap className="w-5 h-5 text-lime-400" />
+              What is Pickle2Fit League?
+            </h4>
+            <p className="text-slate-300 text-sm leading-relaxed mb-3">
+              Welcome to the Pickle2Fit League 2026! This is a live, real-time pickleball tournament platform where players compete across 4 teams in a full round-robin format with 96 total matches.
+            </p>
+            <div className="bg-gradient-to-r from-lime-500/10 to-green-500/10 border border-lime-500/20 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="bg-lime-500/20 p-2 rounded-lg flex-shrink-0">
+                  <Trophy className="w-5 h-5 text-lime-400" />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-lime-400 mb-1">Live Sync Enabled</div>
+                  <div className="text-xs text-slate-300">
+                    All changes sync instantly across all devices. When anyone reports a match result, everyone sees it in real-time!
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* How It Works */}
+          <section>
+            <h4 className="font-bold text-lg text-white mb-3 flex items-center gap-2">
+              <Activity className="w-5 h-5 text-lime-400" />
+              How It Works
+            </h4>
+            <div className="space-y-3">
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-lime-500/20 flex items-center justify-center text-lime-400 font-bold text-sm">
+                  1
+                </div>
+                <div>
+                  <div className="font-semibold text-white text-sm">Sign In with Google</div>
+                  <div className="text-xs text-slate-400">Quick authentication - your name is automatically recognized</div>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-lime-500/20 flex items-center justify-center text-lime-400 font-bold text-sm">
+                  2
+                </div>
+                <div>
+                  <div className="font-semibold text-white text-sm">View Live Dashboard</div>
+                  <div className="text-xs text-slate-400">See real-time standings, upcoming matches, and team stats</div>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-lime-500/20 flex items-center justify-center text-lime-400 font-bold text-sm">
+                  3
+                </div>
+                <div>
+                  <div className="font-semibold text-white text-sm">Report Match Results</div>
+                  <div className="text-xs text-slate-400">After playing, click any match to report the score and winner</div>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-lime-500/20 flex items-center justify-center text-lime-400 font-bold text-sm">
+                  4
+                </div>
+                <div>
+                  <div className="font-semibold text-white text-sm">Watch Standings Update</div>
+                  <div className="text-xs text-slate-400">Standings automatically recalculate as results come in</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Key Features */}
+          <section>
+            <h4 className="font-bold text-lg text-white mb-3 flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-lime-400" />
+              Key Features
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="bg-white/5 border border-white/10 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <Wifi className="w-4 h-4 text-lime-400" />
+                  <div className="font-semibold text-sm text-white">Real-Time Sync</div>
+                </div>
+                <div className="text-xs text-slate-400">Instant updates across all devices</div>
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <Users className="w-4 h-4 text-lime-400" />
+                  <div className="font-semibold text-sm text-white">Player Tracking</div>
+                </div>
+                <div className="text-xs text-slate-400">Know who reported each result</div>
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <Activity className="w-4 h-4 text-lime-400" />
+                  <div className="font-semibold text-sm text-white">Match History</div>
+                </div>
+                <div className="text-xs text-slate-400">Track changes and edits over time</div>
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <Trophy className="w-4 h-4 text-lime-400" />
+                  <div className="font-semibold text-sm text-white">Auto Standings</div>
+                </div>
+                <div className="text-xs text-slate-400">Rankings update automatically</div>
+              </div>
+            </div>
+          </section>
+
+          {/* Tech Stack */}
+          <section>
+            <h4 className="font-bold text-lg text-white mb-3 flex items-center gap-2">
+              <Zap className="w-5 h-5 text-lime-400" />
+              Powered By
+            </h4>
+            <div className="flex flex-wrap gap-2">
+              <span className="px-3 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-full text-xs font-medium text-blue-400">
+                React
+              </span>
+              <span className="px-3 py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-full text-xs font-medium text-orange-400">
+                Firebase
+              </span>
+              <span className="px-3 py-1.5 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-xs font-medium text-cyan-400">
+                Tailwind CSS
+              </span>
+              <span className="px-3 py-1.5 bg-purple-500/10 border border-purple-500/20 rounded-full text-xs font-medium text-purple-400">
+                Firestore
+              </span>
+              <span className="px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full text-xs font-medium text-green-400">
+                Google Auth
+              </span>
+            </div>
+          </section>
+
+          {/* Help Section */}
+          <section>
+            <h4 className="font-bold text-lg text-white mb-3 flex items-center gap-2">
+              <Info className="w-5 h-5 text-lime-400" />
+              Need Help?
+            </h4>
+            <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 space-y-2">
+              <p className="text-sm text-slate-300">
+                <span className="font-semibold text-white">Can't see matches?</span> Make sure you're signed in and check your internet connection.
+              </p>
+              <p className="text-sm text-slate-300">
+                <span className="font-semibold text-white">Results not updating?</span> The app uses real-time sync - refresh if needed.
+              </p>
+              <p className="text-sm text-slate-300">
+                <span className="font-semibold text-white">Wrong score reported?</span> Click the match again to edit - your changes are tracked!
+              </p>
+            </div>
+          </section>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-slate-700 bg-slate-900/50">
+          <button
+            onClick={onClose}
+            className="w-full bg-gradient-to-r from-lime-500 to-green-500 hover:from-lime-400 hover:to-green-400 text-slate-900 font-bold py-3 px-4 rounded-xl transition-all duration-200 active:scale-95"
+          >
+            Got it, let's play!
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1274,6 +1592,7 @@ const ReportModal = ({ match, onClose, onSave, teams, user, playerName }) => {
   const [winner, setWinner] = useState(match.winner || match.teamA);
   const [scheduledDate, setScheduledDate] = useState(match.scheduledDate || '');
   const [showHistory, setShowHistory] = useState(false);
+  const [showPlayers, setShowPlayers] = useState(true);
 
   // Player editing state
   const teamAData = teams.find(t => t.id === match.teamA);
@@ -1328,19 +1647,34 @@ const ReportModal = ({ match, onClose, onSave, teams, user, playerName }) => {
       historyEntry.changes.teamBPlayers = { from: `${match.pB1}, ${match.pB2}`, to: `${pB1}, ${pB2}` };
     }
 
-    // Only add score and winner if scores are provided
+    // Handle score changes
     if (scoreA && scoreB) {
-      const newScore = `${scoreA}-${scoreB}`;
-      const newWinner = parseInt(scoreA) > parseInt(scoreB) ? match.teamA : match.teamB;
+      // If score is 0-0, clear the match result
+      if (scoreA === '0' && scoreB === '0') {
+        updateData.score = '';
+        updateData.winner = null;
+        updateData.reportedDate = null;
+        updateData.reportedBy = null;
+        updateData.reportedById = null;
 
-      updateData.score = newScore;
-      updateData.winner = newWinner;
-      updateData.reportedDate = new Date().toISOString();
-      updateData.reportedBy = displayName;
-      updateData.reportedById = userId;
+        if (match.score) {
+          historyEntry.changes.score = { from: match.score, to: 'Cleared' };
+          historyEntry.changes.winner = { from: match.winner || 'Not set', to: 'Cleared' };
+        }
+      } else {
+        // Normal score entry
+        const newScore = `${scoreA}-${scoreB}`;
+        const newWinner = parseInt(scoreA) > parseInt(scoreB) ? match.teamA : match.teamB;
 
-      historyEntry.changes.score = { from: match.score || 'Not set', to: newScore };
-      historyEntry.changes.winner = { from: match.winner || 'Not set', to: newWinner };
+        updateData.score = newScore;
+        updateData.winner = newWinner;
+        updateData.reportedDate = new Date().toISOString();
+        updateData.reportedBy = displayName;
+        updateData.reportedById = userId;
+
+        historyEntry.changes.score = { from: match.score || 'Not set', to: newScore };
+        historyEntry.changes.winner = { from: match.winner || 'Not set', to: newWinner };
+      }
     }
 
     // Add history entry if there are changes
@@ -1350,6 +1684,69 @@ const ReportModal = ({ match, onClose, onSave, teams, user, playerName }) => {
     }
 
     onSave(match.id, updateData);
+  };
+
+  const handleClear = () => {
+    if (!match.score) return; // Nothing to clear
+
+    const displayName = getUserDisplayName();
+    const userId = user?.uid || 'unknown';
+
+    const updateData = {
+      score: '',
+      winner: null,
+      reportedDate: null,
+      reportedBy: null,
+      reportedById: null
+    };
+
+    // Add history entry
+    const historyEntry = {
+      timestamp: new Date().toISOString(),
+      userName: displayName,
+      userId: userId,
+      changes: {
+        score: { from: match.score, to: 'Cleared' },
+        winner: { from: match.winner || 'Not set', to: 'Cleared' }
+      }
+    };
+
+    const existingHistory = match.history || [];
+    updateData.history = [...existingHistory, historyEntry];
+
+    onSave(match.id, updateData);
+  };
+
+  // Format scheduled date with time in local timezone
+  const formatDate = (dateStr) => {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    today.setHours(0, 0, 0, 0);
+    tomorrow.setHours(0, 0, 0, 0);
+    const compareDate = new Date(date);
+    compareDate.setHours(0, 0, 0, 0);
+
+    // Format time in local timezone
+    const timeStr = date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: date.getMinutes() !== 0 ? '2-digit' : undefined,
+      hour12: true
+    });
+
+    if (compareDate.getTime() === today.getTime()) return `Today at ${timeStr}`;
+    if (compareDate.getTime() === tomorrow.getTime()) return `Tomorrow at ${timeStr}`;
+
+    const dateOnlyStr = date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
+    });
+    return `${dateOnlyStr} at ${timeStr}`;
   };
 
   // Format history timestamp
@@ -1475,18 +1872,31 @@ const ReportModal = ({ match, onClose, onSave, teams, user, playerName }) => {
               </div>
             )}
 
-            {/* Scheduled Date */}
+            {/* Scheduled Date & Time */}
             <div className="space-y-2">
               <label className="text-[10px] uppercase tracking-wide text-slate-400 font-bold flex items-center gap-2">
                 <Calendar className="w-3.5 h-3.5" />
-                Scheduled Date
+                Scheduled Date & Time
               </label>
               <input
-                type="date"
+                type="datetime-local"
                 className="w-full bg-slate-800/50 border border-slate-700 rounded-xl p-3.5 text-sm text-white focus:border-lime-500 focus:ring-2 focus:ring-lime-500/20 outline-none transition-all"
-                value={scheduledDate}
-                onChange={e => setScheduledDate(e.target.value)}
+                value={scheduledDate ? (() => {
+                  const d = new Date(scheduledDate);
+                  const year = d.getFullYear();
+                  const month = String(d.getMonth() + 1).padStart(2, '0');
+                  const day = String(d.getDate()).padStart(2, '0');
+                  const hours = String(d.getHours()).padStart(2, '0');
+                  const minutes = String(d.getMinutes()).padStart(2, '0');
+                  return `${year}-${month}-${day}T${hours}:${minutes}`;
+                })() : ''}
+                onChange={e => setScheduledDate(e.target.value ? new Date(e.target.value).toISOString() : '')}
               />
+              {scheduledDate && (
+                <p className="text-xs text-slate-500 italic">
+                  Displays as: {formatDate(scheduledDate)}
+                </p>
+              )}
             </div>
 
             <div className="relative">
@@ -1494,10 +1904,18 @@ const ReportModal = ({ match, onClose, onSave, teams, user, playerName }) => {
                 <div className="w-full border-t border-slate-700"></div>
               </div>
               <div className="relative flex justify-center">
-                <span className="bg-slate-900 px-3 text-xs text-slate-500 uppercase tracking-wide">Match Details</span>
+                <button
+                  onClick={() => setShowPlayers(!showPlayers)}
+                  className="bg-slate-900 px-3 text-xs text-slate-400 hover:text-slate-300 uppercase tracking-wide flex items-center gap-2 transition-colors"
+                >
+                  <span>Player Details</span>
+                  {showPlayers ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
               </div>
             </div>
 
+            {showPlayers && (
+              <>
             {/* Team A Section */}
             <div className="space-y-3 bg-slate-800/30 rounded-xl p-4 border border-slate-700/50">
               <div className="flex justify-between items-center">
@@ -1576,22 +1994,34 @@ const ReportModal = ({ match, onClose, onSave, teams, user, playerName }) => {
                 />
               </div>
             </div>
+              </>
+            )}
           </div>
         </div>
 
         <div className="p-4 border-t border-slate-700 bg-slate-900/50 backdrop-blur-sm flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3.5 rounded-xl text-sm font-semibold text-slate-300 bg-slate-800 hover:bg-slate-750 border border-slate-700 transition-all active:scale-95"
+            className="px-4 py-3.5 rounded-xl text-sm font-semibold text-slate-300 bg-slate-800 hover:bg-slate-750 border border-slate-700 transition-all active:scale-95 flex items-center justify-center"
+            title="Cancel"
           >
-            Cancel
+            <X size={20} />
           </button>
+          {match.score && (
+            <button
+              onClick={handleClear}
+              className="px-4 py-3.5 rounded-xl text-sm font-semibold text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 transition-all active:scale-95 flex items-center justify-center"
+              title="Clear match result"
+            >
+              <Trash2 size={20} />
+            </button>
+          )}
           <button
             onClick={handleSave}
-            className="flex-1 bg-gradient-to-r from-lime-500 to-green-500 hover:from-lime-400 hover:to-green-400 text-slate-900 px-6 py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-lime-500/20 transition-all active:scale-95"
+            className="flex-1 bg-gradient-to-r from-lime-500 to-green-500 hover:from-lime-400 hover:to-green-400 text-slate-900 px-6 py-3.5 rounded-xl text-sm font-bold flex items-center justify-center shadow-lg shadow-lime-500/20 transition-all active:scale-95"
+            title={scoreA && scoreB ? 'Save Result' : 'Save Changes'}
           >
-            <Save size={18} />
-            <span>{scoreA && scoreB ? 'Save Result' : 'Save Changes'}</span>
+            <Save size={20} />
           </button>
         </div>
       </div>
