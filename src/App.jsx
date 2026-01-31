@@ -2374,7 +2374,7 @@ const TeamsList = ({ teams }) => {
                   </div>
                   <div>
                     <div className="text-[10px] uppercase font-bold text-slate-500">Captain</div>
-                    <div className="font-bold text-slate-200">{getPlayerName(team.captain)}</div>
+                    <div className="font-bold text-slate-200">{getPlayerName(team.captain, true)}</div>
                   </div>
                 </div>
 
@@ -2382,7 +2382,7 @@ const TeamsList = ({ teams }) => {
                   {team.players.filter(p => p !== team.captain).map(playerId => (
                     <div key={playerId} className="bg-slate-700/30 p-2 rounded-lg text-sm text-slate-300 flex items-center gap-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-                      {getPlayerName(playerId)}
+                      {getPlayerName(playerId, true)}
                     </div>
                   ))}
                 </div>
