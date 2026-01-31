@@ -1147,6 +1147,19 @@ const MatchCard = ({ match, teams, searchQuery = '', onEdit }) => {
   const teamAData = teams.find(t => t.id === match.teamA);
   const teamBData = teams.find(t => t.id === match.teamB);
 
+  // Determine match status
+  const getMatchStatus = () => {
+    if (isPlayed) {
+      return { label: 'Completed', className: 'bg-green-500/20 text-green-400' };
+    } else if (match.scheduledDate) {
+      return { label: 'Scheduled', className: 'bg-blue-500/20 text-blue-400' };
+    } else {
+      return { label: 'Unscheduled', className: 'bg-slate-700 text-slate-400' };
+    }
+  };
+
+  const matchStatus = getMatchStatus();
+
   // Helper to highlight matching text
   const highlightText = (text) => {
     if (!searchQuery.trim()) return text;
@@ -1207,8 +1220,8 @@ const MatchCard = ({ match, teams, searchQuery = '', onEdit }) => {
     >
       <div className="flex justify-between items-start mb-3">
         <div className="flex flex-col gap-1">
-          <Badge className={isPlayed ? "bg-slate-700 text-slate-400" : "bg-blue-500/20 text-blue-400"}>
-            {isPlayed ? "Final" : "Scheduled"}
+          <Badge className={`${matchStatus.className} self-start`}>
+            {matchStatus.label}
           </Badge>
           {match.scheduledDate && (
             <div className="flex items-center gap-1.5 text-xs text-slate-400">
