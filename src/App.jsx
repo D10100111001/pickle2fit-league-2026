@@ -1409,7 +1409,7 @@ const MatchCard = ({ match, teams, searchQuery = '', onEdit }) => {
         <span className="text-xs font-mono text-slate-500">Game #{match.id}</span>
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         {/* Team A */}
         <div className="flex-1">
           <div className={`font-bold text-lg ${match.winner === match.teamA ? 'text-lime-400' : 'text-white'}`}>
@@ -1425,9 +1425,20 @@ const MatchCard = ({ match, teams, searchQuery = '', onEdit }) => {
         {/* VS / Score */}
         <div className="px-4 text-center">
           {isPlayed ? (
-             <div className="bg-slate-900 rounded-lg px-3 py-1 font-mono font-bold text-xl border border-white/10">
-               {match.score}
-             </div>
+            <div className="flex flex-col gap-1">
+              <div className="bg-slate-900 rounded-lg px-3 py-1 font-mono font-bold text-xl border border-white/10">
+                {match.score}
+              </div>
+              {match.games && match.games.length > 0 && (
+                <div className="text-[10px] text-slate-500 space-y-0.5">
+                  {match.games.filter(g => g.scoreA && g.scoreB).map((game, i) => (
+                    <div key={i} className="font-mono">
+                      {game.scoreA}-{game.scoreB}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           ) : (
             <div className="text-slate-600 font-bold text-sm bg-slate-900/50 w-8 h-8 rounded-full flex items-center justify-center">
               VS
@@ -1779,8 +1790,12 @@ const PlayerIdentificationModal = ({ teams, onIdentify }) => {
 
 const ReportModal = ({ match, onClose, onSave, teams, user, playerName }) => {
   const { getPlayerName } = usePlayers();
-  const [scoreA, setScoreA] = useState('');
-  const [scoreB, setScoreB] = useState('');
+  // Initialize games from match.games or create 3 empty games
+  const [games, setGames] = useState(match.games || [
+    { scoreA: '', scoreB: '' },
+    { scoreA: '', scoreB: '' },
+    { scoreA: '', scoreB: '' }
+  ]);
   const [winner, setWinner] = useState(match.winner || match.teamA);
   const [scheduledDate, setScheduledDate] = useState(match.scheduledDate || '');
   const [showHistory, setShowHistory] = useState(false);
@@ -1839,34 +1854,40 @@ const ReportModal = ({ match, onClose, onSave, teams, user, playerName }) => {
       historyEntry.changes.teamBPlayers = { from: `${match.pB1}, ${match.pB2}`, to: `${pB1}, ${pB2}` };
     }
 
-    // Handle score changes
-    if (scoreA && scoreB) {
-      // If score is 0-0, clear the match result
-      if (scoreA === '0' && scoreB === '0') {
-        updateData.score = '';
-        updateData.winner = null;
-        updateData.reportedDate = null;
-        updateData.reportedBy = null;
-        updateData.reportedById = null;
+    // Calculate match winner based on games (best of 3)
+    const validGames = games.filter(g => g.scoreA && g.scoreB);
 
-        if (match.score) {
-          historyEntry.changes.score = { from: match.score, to: 'Cleared' };
-          historyEntry.changes.winner = { from: match.winner || 'Not set', to: 'Cleared' };
+    if (validGames.length > 0) {
+      // Calculate who won each game
+      let teamAWins = 0;
+      let teamBWins = 0;
+
+      validGames.forEach(game => {
+        const scoreA = parseInt(game.scoreA);
+        const scoreB = parseInt(game.scoreB);
+        if (scoreA > scoreB) {
+          teamAWins++;
+        } else if (scoreB > scoreA) {
+          teamBWins++;
         }
-      } else {
-        // Normal score entry
-        const newScore = `${scoreA}-${scoreB}`;
-        const newWinner = parseInt(scoreA) > parseInt(scoreB) ? match.teamA : match.teamB;
+      });
 
-        updateData.score = newScore;
-        updateData.winner = newWinner;
-        updateData.reportedDate = new Date().toISOString();
-        updateData.reportedBy = displayName;
-        updateData.reportedById = userId;
+      // Determine match winner (best of 3)
+      const matchWinner = teamAWins > teamBWins ? match.teamA : match.teamB;
+      const matchScore = `${teamAWins}-${teamBWins}`;
 
-        historyEntry.changes.score = { from: match.score || 'Not set', to: newScore };
-        historyEntry.changes.winner = { from: match.winner || 'Not set', to: newWinner };
-      }
+      updateData.games = games;
+      updateData.score = matchScore;
+      updateData.winner = matchWinner;
+      updateData.reportedDate = new Date().toISOString();
+      updateData.reportedBy = displayName;
+      updateData.reportedById = userId;
+
+      // Format games for history
+      const gamesStr = validGames.map((g, i) => `Game ${i + 1}: ${g.scoreA}-${g.scoreB}`).join(', ');
+      historyEntry.changes.games = { from: match.games ? 'Previous games' : 'Not set', to: gamesStr };
+      historyEntry.changes.score = { from: match.score || 'Not set', to: matchScore };
+      historyEntry.changes.winner = { from: match.winner || 'Not set', to: matchWinner };
     }
 
     // Add history entry if there are changes
@@ -1887,6 +1908,7 @@ const ReportModal = ({ match, onClose, onSave, teams, user, playerName }) => {
     const updateData = {
       score: '',
       winner: null,
+      games: null,
       reportedDate: null,
       reportedBy: null,
       reportedById: null
@@ -1899,7 +1921,8 @@ const ReportModal = ({ match, onClose, onSave, teams, user, playerName }) => {
       userId: userId,
       changes: {
         score: { from: match.score, to: 'Cleared' },
-        winner: { from: match.winner || 'Not set', to: 'Cleared' }
+        winner: { from: match.winner || 'Not set', to: 'Cleared' },
+        games: { from: 'Previous games', to: 'Cleared' }
       }
     };
 
@@ -2051,83 +2074,104 @@ const ReportModal = ({ match, onClose, onSave, teams, user, playerName }) => {
 
             {showPlayers && (
               <>
-            {/* Team A Section */}
-            <div className="space-y-3 bg-slate-800/30 rounded-xl p-4 border border-slate-700/50">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full bg-gradient-to-br ${teamAData?.color || 'from-lime-400 to-green-500'}`}></div>
-                  <span className="font-bold text-base text-white">{teamAData?.name || match.teamA}</span>
+            {/* Team Players Section */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Team A */}
+              <div className="space-y-3 bg-slate-800/30 rounded-xl p-4 border border-slate-700/50">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-3 h-3 rounded-full bg-gradient-to-br ${teamAData?.color || 'from-lime-400 to-green-500'}`}></div>
+                    <span className="font-bold text-sm text-white">{teamAData?.name || match.teamA}</span>
+                  </div>
+                  {checkFlexA && <Badge className="bg-pink-500/20 text-pink-400 text-[10px]">Flex</Badge>}
                 </div>
-                {checkFlexA && <Badge className="bg-pink-500/20 text-pink-400 text-[10px]">Flex</Badge>}
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <label className="text-[9px] uppercase text-slate-500 font-medium">Player 1</label>
+                    <select className="w-full bg-slate-700/50 border border-slate-600 rounded-lg p-2 text-xs text-white focus:border-lime-500 focus:ring-2 focus:ring-lime-500/20 outline-none transition-all" value={pA1} onChange={e => setPA1(e.target.value)}>
+                      {teamAData?.players.map(p => <option key={p} value={p}>{getPlayerName(p, true)}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] uppercase text-slate-500 font-medium">Player 2</label>
+                    <select className="w-full bg-slate-700/50 border border-slate-600 rounded-lg p-2 text-xs text-white focus:border-lime-500 focus:ring-2 focus:ring-lime-500/20 outline-none transition-all" value={pA2} onChange={e => setPA2(e.target.value)}>
+                      {teamAData?.players.map(p => <option key={p} value={p}>{getPlayerName(p, true)}</option>)}
+                    </select>
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase text-slate-500 font-medium">Player 1</label>
-                  <select className="w-full bg-slate-700/50 border border-slate-600 rounded-lg p-3 text-sm text-white focus:border-lime-500 focus:ring-2 focus:ring-lime-500/20 outline-none transition-all" value={pA1} onChange={e => setPA1(e.target.value)}>
-                    {teamAData?.players.map(p => <option key={p} value={p}>{getPlayerName(p, true)}</option>)}
-                  </select>
+
+              {/* Team B */}
+              <div className="space-y-3 bg-slate-800/30 rounded-xl p-4 border border-slate-700/50">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-3 h-3 rounded-full bg-gradient-to-br ${teamBData?.color || 'from-orange-400 to-red-500'}`}></div>
+                    <span className="font-bold text-sm text-white">{teamBData?.name || match.teamB}</span>
+                  </div>
+                  {checkFlexB && <Badge className="bg-pink-500/20 text-pink-400 text-[10px]">Flex</Badge>}
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase text-slate-500 font-medium">Player 2</label>
-                  <select className="w-full bg-slate-700/50 border border-slate-600 rounded-lg p-3 text-sm text-white focus:border-lime-500 focus:ring-2 focus:ring-lime-500/20 outline-none transition-all" value={pA2} onChange={e => setPA2(e.target.value)}>
-                    {teamAData?.players.map(p => <option key={p} value={p}>{getPlayerName(p, true)}</option>)}
-                  </select>
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <label className="text-[9px] uppercase text-slate-500 font-medium">Player 1</label>
+                    <select className="w-full bg-slate-700/50 border border-slate-600 rounded-lg p-2 text-xs text-white focus:border-lime-500 focus:ring-2 focus:ring-lime-500/20 outline-none transition-all" value={pB1} onChange={e => setPB1(e.target.value)}>
+                      {teamBData?.players.map(p => <option key={p} value={p}>{getPlayerName(p, true)}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] uppercase text-slate-500 font-medium">Player 2</label>
+                    <select className="w-full bg-slate-700/50 border border-slate-600 rounded-lg p-2 text-xs text-white focus:border-lime-500 focus:ring-2 focus:ring-lime-500/20 outline-none transition-all" value={pB2} onChange={e => setPB2(e.target.value)}>
+                      {teamBData?.players.map(p => <option key={p} value={p}>{getPlayerName(p, true)}</option>)}
+                    </select>
+                  </div>
                 </div>
-              </div>
-              <div className="pt-2">
-                <label className="text-[10px] uppercase text-slate-500 font-medium mb-2 block">Score</label>
-                <input
-                  type="number"
-                  className="w-full bg-slate-700/50 border border-slate-600 rounded-lg p-4 text-center font-mono text-2xl text-white focus:border-lime-500 focus:ring-2 focus:ring-lime-500/20 outline-none transition-all"
-                  value={scoreA}
-                  onChange={e => setScoreA(e.target.value)}
-                  placeholder="0"
-                  inputMode="numeric"
-                />
               </div>
             </div>
 
-            {/* VS Divider */}
-            <div className="flex items-center justify-center">
-              <div className="bg-slate-700/50 rounded-full px-4 py-2">
-                <span className="text-sm font-bold text-slate-400">VS</span>
+            {/* Best of 3 Games Scores */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-lime-400" />
+                <h4 className="text-sm font-bold text-white uppercase tracking-wide">Best of 3 Games</h4>
               </div>
-            </div>
 
-            {/* Team B Section */}
-            <div className="space-y-3 bg-slate-800/30 rounded-xl p-4 border border-slate-700/50">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full bg-gradient-to-br ${teamBData?.color || 'from-orange-400 to-red-500'}`}></div>
-                  <span className="font-bold text-base text-white">{teamBData?.name || match.teamB}</span>
+              {games.map((game, index) => (
+                <div key={index} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-shrink-0">
+                      <span className="text-xs font-bold text-slate-400">Game {index + 1}</span>
+                    </div>
+                    <div className="flex-1 grid grid-cols-3 gap-2 items-center">
+                      <input
+                        type="number"
+                        min="0"
+                        max="99"
+                        placeholder="0"
+                        value={game.scoreA}
+                        onChange={(e) => {
+                          const newGames = [...games];
+                          newGames[index].scoreA = e.target.value;
+                          setGames(newGames);
+                        }}
+                        className="w-full bg-slate-700/50 border border-slate-600 rounded-lg p-3 text-center font-mono text-xl text-white focus:border-lime-500 focus:ring-2 focus:ring-lime-500/20 outline-none transition-all"
+                      />
+                      <div className="text-center text-slate-500 font-bold text-sm">-</div>
+                      <input
+                        type="number"
+                        min="0"
+                        max="99"
+                        placeholder="0"
+                        value={game.scoreB}
+                        onChange={(e) => {
+                          const newGames = [...games];
+                          newGames[index].scoreB = e.target.value;
+                          setGames(newGames);
+                        }}
+                        className="w-full bg-slate-700/50 border border-slate-600 rounded-lg p-3 text-center font-mono text-xl text-white focus:border-lime-500 focus:ring-2 focus:ring-lime-500/20 outline-none transition-all"
+                      />
+                    </div>
+                  </div>
                 </div>
-                {checkFlexB && <Badge className="bg-pink-500/20 text-pink-400 text-[10px]">Flex</Badge>}
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase text-slate-500 font-medium">Player 1</label>
-                  <select className="w-full bg-slate-700/50 border border-slate-600 rounded-lg p-3 text-sm text-white focus:border-lime-500 focus:ring-2 focus:ring-lime-500/20 outline-none transition-all" value={pB1} onChange={e => setPB1(e.target.value)}>
-                    {teamBData?.players.map(p => <option key={p} value={p}>{getPlayerName(p, true)}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase text-slate-500 font-medium">Player 2</label>
-                  <select className="w-full bg-slate-700/50 border border-slate-600 rounded-lg p-3 text-sm text-white focus:border-lime-500 focus:ring-2 focus:ring-lime-500/20 outline-none transition-all" value={pB2} onChange={e => setPB2(e.target.value)}>
-                    {teamBData?.players.map(p => <option key={p} value={p}>{getPlayerName(p, true)}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="pt-2">
-                <label className="text-[10px] uppercase text-slate-500 font-medium mb-2 block">Score</label>
-                <input
-                  type="number"
-                  className="w-full bg-slate-700/50 border border-slate-600 rounded-lg p-4 text-center font-mono text-2xl text-white focus:border-lime-500 focus:ring-2 focus:ring-lime-500/20 outline-none transition-all"
-                  value={scoreB}
-                  onChange={e => setScoreB(e.target.value)}
-                  placeholder="0"
-                  inputMode="numeric"
-                />
-              </div>
+              ))}
             </div>
               </>
             )}
@@ -2232,7 +2276,7 @@ const ReportModal = ({ match, onClose, onSave, teams, user, playerName }) => {
           <button
             onClick={handleSave}
             className="flex-1 bg-gradient-to-r from-lime-500 to-green-500 hover:from-lime-400 hover:to-green-400 text-slate-900 px-6 py-3.5 rounded-xl text-sm font-bold flex items-center justify-center shadow-lg shadow-lime-500/20 transition-all active:scale-95"
-            title={scoreA && scoreB ? 'Save Result' : 'Save Changes'}
+            title={games.some(g => g.scoreA && g.scoreB) ? 'Save Result' : 'Save Changes'}
           >
             <Save size={20} />
           </button>
