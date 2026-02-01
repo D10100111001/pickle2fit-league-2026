@@ -38,7 +38,11 @@ import {
   getDoc,
   collection,
   onSnapshot,
-  writeBatch
+  writeBatch,
+  deleteDoc,
+  query,
+  where,
+  getDocs
 } from 'firebase/firestore';
 
 /**
@@ -452,6 +456,67 @@ const TimeSlotsProvider = ({ children, user }) => {
     }
   };
 
+  const updateTimeSlot = async (timeSlotId, dateTime, location, notes) => {
+    if (!user) return;
+    try {
+      const timeSlotRef = doc(db, 'artifacts', appId, 'public', 'data', 'timeSlots', timeSlotId);
+      const timeSlotSnap = await getDoc(timeSlotRef);
+      if (!timeSlotSnap.exists()) return;
+
+      const timeSlotData = timeSlotSnap.data();
+
+      // Track what changed
+      const changes = {};
+      if (dateTime && new Date(dateTime).toISOString() !== timeSlotData.dateTime) {
+        changes.dateTime = { from: timeSlotData.dateTime, to: new Date(dateTime).toISOString() };
+      }
+      if (location !== timeSlotData.location) {
+        changes.location = { from: timeSlotData.location, to: location };
+      }
+      if (notes !== timeSlotData.notes) {
+        changes.notes = { from: timeSlotData.notes, to: notes };
+      }
+
+      const historyEntry = {
+        timestamp: new Date().toISOString(),
+        userId: user.uid,
+        userName: user.displayName || user.email || 'Unknown',
+        action: 'updated',
+        changes
+      };
+
+      await setDoc(timeSlotRef, {
+        ...timeSlotData,
+        dateTime: dateTime ? new Date(dateTime).toISOString() : timeSlotData.dateTime,
+        location: location || '',
+        notes: notes || '',
+        history: [...(timeSlotData.history || []), historyEntry]
+      });
+    } catch (e) {
+      console.error("Error updating time slot:", e);
+      throw e;
+    }
+  };
+
+  const deleteTimeSlot = async (timeSlotId) => {
+    if (!user) return;
+    try {
+      const timeSlotRef = doc(db, 'artifacts', appId, 'public', 'data', 'timeSlots', timeSlotId);
+      await deleteDoc(timeSlotRef);
+
+      // Also delete associated RSVPs
+      const rsvpsRef = collection(db, 'artifacts', appId, 'public', 'data', 'rsvps');
+      const q = query(rsvpsRef, where('timeSlotId', '==', timeSlotId));
+      const rsvpSnaps = await getDocs(q);
+
+      const deletePromises = rsvpSnaps.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
+    } catch (e) {
+      console.error("Error deleting time slot:", e);
+      throw e;
+    }
+  };
+
   const submitRSVP = async (timeSlotId, playerId, status, notes, onBehalfOf = false) => {
     if (!user) return;
     try {
@@ -574,8 +639,11 @@ const TimeSlotsProvider = ({ children, user }) => {
   const value = {
     timeSlots,
     rsvps,
+    user,
     proposeTimeSlot,
     cancelTimeSlot,
+    updateTimeSlot,
+    deleteTimeSlot,
     submitRSVP,
     linkMatchToTimeSlot,
     getRSVPsForTimeSlot,
@@ -2780,7 +2848,7 @@ const TeamsList = ({ teams }) => {
 // --- TIME SLOT SCHEDULING ---
 
 const TimeSlotScheduler = ({ matches }) => {
-  const { timeSlots, proposeTimeSlot } = useTimeSlots();
+  const { timeSlots, proposeTimeSlot, updateTimeSlot, deleteTimeSlot } = useTimeSlots();
   const { getPlayerName } = usePlayers();
   const [showProposalModal, setShowProposalModal] = useState(false);
   const [showPastSlots, setShowPastSlots] = useState(false);
@@ -2861,6 +2929,8 @@ const TimeSlotScheduler = ({ matches }) => {
                 timeSlot={slot}
                 matches={matches}
                 getPlayerName={getPlayerName}
+                updateTimeSlot={updateTimeSlot}
+                deleteTimeSlot={deleteTimeSlot}
               />
             ))}
           </div>
@@ -2990,9 +3060,231 @@ const TimeSlotProposalModal = ({ onClose, onSubmit }) => {
   );
 };
 
-const TimeSlotCard = ({ timeSlot, matches, getPlayerName }) => {
-  const { getRSVPsForTimeSlot } = useTimeSlots();
+const TimeSlotEditModal = ({ timeSlot, onClose, onSubmit }) => {
+  const formatDateTimeLocal = (isoString) => {
+    const date = new Date(isoString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const [dateTime, setDateTime] = useState(formatDateTimeLocal(timeSlot.dateTime));
+  const [location, setLocation] = useState(timeSlot.location || '');
+  const [notes, setNotes] = useState(timeSlot.notes || '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!dateTime) {
+      setError('Please select a date and time');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
+    try {
+      await onSubmit(timeSlot.id, dateTime, location, notes);
+      onClose();
+    } catch (err) {
+      console.error('Error updating time slot:', err);
+      setError('Failed to update time slot. Please try again.');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-slate-800/95 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl max-w-lg w-full p-6 animate-in slide-in-from-bottom-4 duration-300">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-2xl font-black text-white flex items-center gap-2">
+            <Edit3 className="text-blue-400" size={24} />
+            Edit Time Slot
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors"
+          >
+            <X size={20} className="text-slate-400" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Date & Time *
+            </label>
+            <input
+              type="datetime-local"
+              value={dateTime}
+              onChange={(e) => setDateTime(e.target.value)}
+              className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Location
+            </label>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="e.g., Downtown Courts, Main Facility"
+              className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Notes
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Additional details about this play time..."
+              rows={3}
+              className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all resize-none"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-3 bg-slate-700/50 hover:bg-slate-700 text-white font-medium rounded-xl transition-colors"
+              disabled={saving}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 disabled:from-slate-600 disabled:to-slate-600 text-white font-bold rounded-xl shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
+            >
+              {saving ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                'Update'
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+const DeleteConfirmModal = ({ onClose, onConfirm, timeSlot }) => {
+  const [deleting, setDeleting] = useState(false);
+
+  const handleConfirm = async () => {
+    setDeleting(true);
+    try {
+      await onConfirm();
+    } catch (err) {
+      console.error('Error deleting:', err);
+      setDeleting(false);
+    }
+  };
+
+  const formatDateTime = (isoString) => {
+    const date = new Date(isoString);
+    const options = {
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    };
+    return date.toLocaleDateString('en-US', options);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-slate-800/95 backdrop-blur-md border border-red-500/20 rounded-2xl shadow-2xl max-w-md w-full p-6 animate-in slide-in-from-bottom-4 duration-300">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-2xl font-black text-white flex items-center gap-2">
+            <Trash2 className="text-red-400" size={24} />
+            Delete Time Slot
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors"
+          >
+            <X size={20} className="text-slate-400" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <p className="text-slate-300">
+            Are you sure you want to delete this time slot?
+          </p>
+
+          <div className="bg-slate-900/50 rounded-xl p-4 border border-white/5">
+            <div className="text-lime-400 font-bold mb-1">
+              {formatDateTime(timeSlot.dateTime)}
+            </div>
+            {timeSlot.location && (
+              <div className="text-slate-400 text-sm">
+                📍 {timeSlot.location}
+              </div>
+            )}
+          </div>
+
+          <p className="text-red-400 text-sm">
+            This action cannot be undone. All RSVPs for this time slot will also be deleted.
+          </p>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-3 bg-slate-700/50 hover:bg-slate-700 text-white font-medium rounded-xl transition-colors"
+              disabled={deleting}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={deleting}
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:from-slate-600 disabled:to-slate-600 text-white font-bold rounded-xl shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const TimeSlotCard = ({ timeSlot, matches, getPlayerName, updateTimeSlot, deleteTimeSlot }) => {
+  const { getRSVPsForTimeSlot, user } = useTimeSlots();
   const [showRSVPModal, setShowRSVPModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   const rsvps = getRSVPsForTimeSlot(timeSlot.id);
@@ -3019,6 +3311,16 @@ const TimeSlotCard = ({ timeSlot, matches, getPlayerName }) => {
   };
 
   const isPast = new Date(timeSlot.dateTime) < new Date();
+  const canEdit = user && user.uid === timeSlot.proposedById;
+
+  const handleDelete = async () => {
+    try {
+      await deleteTimeSlot(timeSlot.id);
+      setShowDeleteConfirm(false);
+    } catch (err) {
+      console.error('Error deleting time slot:', err);
+    }
+  };
 
   return (
     <>
@@ -3026,6 +3328,22 @@ const TimeSlotCard = ({ timeSlot, matches, getPlayerName }) => {
         <RSVPModal
           timeSlot={timeSlot}
           onClose={() => setShowRSVPModal(false)}
+        />
+      )}
+
+      {showEditModal && (
+        <TimeSlotEditModal
+          timeSlot={timeSlot}
+          onClose={() => setShowEditModal(false)}
+          onSubmit={updateTimeSlot}
+        />
+      )}
+
+      {showDeleteConfirm && (
+        <DeleteConfirmModal
+          onClose={() => setShowDeleteConfirm(false)}
+          onConfirm={handleDelete}
+          timeSlot={timeSlot}
         />
       )}
 
@@ -3096,6 +3414,24 @@ const TimeSlotCard = ({ timeSlot, matches, getPlayerName }) => {
               {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
               Details
             </button>
+            {canEdit && (
+              <>
+                <button
+                  onClick={() => setShowEditModal(true)}
+                  className="px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-400 font-medium rounded-xl transition-colors flex items-center gap-2"
+                  title="Edit time slot"
+                >
+                  <Edit3 size={18} />
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="px-4 py-2 bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-400 font-medium rounded-xl transition-colors flex items-center gap-2"
+                  title="Delete time slot"
+                >
+                  <Trash2 size={18} />
+                </button>
+              </>
+            )}
           </div>
         </div>
       </Card>
