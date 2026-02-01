@@ -3133,9 +3133,13 @@ const calculateMissingPlayerImpact = (matches, attendingPlayerIds, getPlayerName
     if (missingPlayers.length > 0 && missingPlayers.length <= 2) {
       missingPlayers.forEach(playerId => {
         if (!playerImpact[playerId]) {
+          // Find player's team
+          const team = INITIAL_TEAMS.find(t => t.players.includes(playerId));
+
           playerImpact[playerId] = {
             playerId,
             playerName: getPlayerName(playerId, true),
+            team: team || null,
             matchCount: 0,
             matches: []
           };
@@ -3249,6 +3253,19 @@ const PlayableMatchesSection = ({ playableMatches, timeSlot, totalRsvps }) => {
     }
   };
 
+  // Sort matches: linked ones first, then unlinked
+  const sortedMatches = useMemo(() => {
+    return [...playableMatches].sort((a, b) => {
+      const aLinked = timeSlot.linkedMatches?.includes(a.id);
+      const bLinked = timeSlot.linkedMatches?.includes(b.id);
+      if (aLinked && !bLinked) return -1;
+      if (!aLinked && bLinked) return 1;
+      return a.id - b.id;
+    });
+  }, [playableMatches, timeSlot.linkedMatches]);
+
+  const linkedCount = timeSlot.linkedMatches?.length || 0;
+
   return (
     <div className={`${playableMatches.length > 0 ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-900/50 border-white/10'} border rounded-xl p-4`}>
       <div className="flex items-center gap-2 mb-3">
@@ -3259,6 +3276,11 @@ const PlayableMatchesSection = ({ playableMatches, timeSlot, totalRsvps }) => {
             : 'Playable Matches'
           }
         </span>
+        {linkedCount > 0 && (
+          <span className="text-xs text-lime-400 bg-lime-500/20 px-2 py-0.5 rounded-full">
+            {linkedCount} linked
+          </span>
+        )}
       </div>
 
       {playableMatches.length === 0 ? (
@@ -3273,16 +3295,58 @@ const PlayableMatchesSection = ({ playableMatches, timeSlot, totalRsvps }) => {
         </div>
       ) : (
         <div className="space-y-2">
-          {playableMatches.map(match => {
+          {sortedMatches.map(match => {
             const isLinked = timeSlot.linkedMatches?.includes(match.id);
+
+            // Find teams for this match
+            const teamA = INITIAL_TEAMS.find(t => t.players.includes(match.pA1));
+            const teamB = INITIAL_TEAMS.find(t => t.players.includes(match.pB1));
+
             return (
               <div
                 key={match.id}
-                className="bg-slate-900/50 rounded-lg p-3 flex items-center justify-between gap-3"
+                className={`bg-slate-900/50 rounded-lg p-3 flex items-center justify-between gap-3 ${
+                  isLinked ? 'ring-1 ring-lime-500/30' : ''
+                }`}
               >
                 <div className="flex-1">
-                  <div className="text-sm font-medium text-white">
+                  <div className="text-sm font-medium text-white flex items-center gap-2">
                     Match #{match.id}
+                    {isLinked && (
+                      <span className="text-[10px] text-lime-400">📌</span>
+                    )}
+                    {/* Team indicators */}
+                    {teamA && teamB && (
+                      <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-0.5">
+                          {teamA.logo && (
+                            <img
+                              src={teamA.logo}
+                              alt={teamA.name}
+                              className="w-3.5 h-3.5 object-contain opacity-60"
+                              title={teamA.name}
+                            />
+                          )}
+                          <span className={`text-[9px] font-bold bg-gradient-to-r ${teamA.color} bg-clip-text text-transparent opacity-70`}>
+                            {teamA.name.split(' ').map(w => w[0]).join('')}
+                          </span>
+                        </div>
+                        <span className="text-[9px] text-slate-600">vs</span>
+                        <div className="flex items-center gap-0.5">
+                          {teamB.logo && (
+                            <img
+                              src={teamB.logo}
+                              alt={teamB.name}
+                              className="w-3.5 h-3.5 object-contain opacity-60"
+                              title={teamB.name}
+                            />
+                          )}
+                          <span className={`text-[9px] font-bold bg-gradient-to-r ${teamB.color} bg-clip-text text-transparent opacity-70`}>
+                            {teamB.name.split(' ').map(w => w[0]).join('')}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="text-xs text-slate-400">
                     {getPlayerName(match.pA1)} & {getPlayerName(match.pA2)} vs{' '}
@@ -3309,7 +3373,7 @@ const PlayableMatchesSection = ({ playableMatches, timeSlot, totalRsvps }) => {
   );
 };
 
-const MissingPlayersSection = ({ missingPlayers, expanded, setExpanded }) => {
+const MissingPlayersSection = ({ missingPlayers, expanded }) => {
   if (missingPlayers.length === 0) return null;
 
   const getPriorityStars = (count) => {
@@ -3337,6 +3401,21 @@ const MissingPlayersSection = ({ missingPlayers, expanded, setExpanded }) => {
                 <div className="text-sm font-medium text-white flex items-center gap-2">
                   <span className="text-orange-400">{idx + 1}.</span>
                   {player.playerName}
+                  {player.team && (
+                    <div className="flex items-center gap-1">
+                      {player.team.logo && (
+                        <img
+                          src={player.team.logo}
+                          alt={player.team.name}
+                          className="w-4 h-4 object-contain opacity-70"
+                          title={player.team.name}
+                        />
+                      )}
+                      <span className={`text-[10px] font-bold bg-gradient-to-r ${player.team.color} bg-clip-text text-transparent opacity-80`}>
+                        {player.team.name.split(' ').map(w => w[0]).join('')}
+                      </span>
+                    </div>
+                  )}
                   <span className="text-xs">{getPriorityStars(player.matchCount)}</span>
                 </div>
                 <div className="text-xs text-slate-400">
