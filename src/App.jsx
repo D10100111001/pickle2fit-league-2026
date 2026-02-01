@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, createContext, useContext 
 import {
   Trophy,
   Calendar,
+  CalendarClock,
   Users,
   Activity,
   Filter,
@@ -330,6 +331,264 @@ const PlayersProvider = ({ children, user }) => {
   );
 };
 
+// --- Time Slots Context ---
+
+const TimeSlotsContext = createContext(null);
+
+export const useTimeSlots = () => {
+  const context = useContext(TimeSlotsContext);
+  if (!context) {
+    throw new Error('useTimeSlots must be used within TimeSlotsProvider');
+  }
+  return context;
+};
+
+const TimeSlotsProvider = ({ children, user }) => {
+  const [timeSlots, setTimeSlots] = useState([]);
+  const [rsvps, setRsvps] = useState([]);
+  const timeSlotsInitialized = useRef(false);
+  const rsvpsInitialized = useRef(false);
+
+  // Real-time Time Slots Sync
+  useEffect(() => {
+    if (!user) return;
+
+    const timeSlotsRef = collection(db, 'artifacts', appId, 'public', 'data', 'timeSlots');
+
+    const unsubscribe = onSnapshot(timeSlotsRef, (snapshot) => {
+      if (snapshot.empty && !timeSlotsInitialized.current) {
+        timeSlotsInitialized.current = true;
+        setTimeSlots([]);
+        return;
+      }
+
+      const loadedTimeSlots = snapshot.docs.map(doc => doc.data());
+      // Sort by dateTime (upcoming first)
+      loadedTimeSlots.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
+      setTimeSlots(loadedTimeSlots);
+    }, (error) => {
+      console.error("Time slots sync error:", error);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // Real-time RSVPs Sync
+  useEffect(() => {
+    if (!user) return;
+
+    const rsvpsRef = collection(db, 'artifacts', appId, 'public', 'data', 'rsvps');
+
+    const unsubscribe = onSnapshot(rsvpsRef, (snapshot) => {
+      if (snapshot.empty && !rsvpsInitialized.current) {
+        rsvpsInitialized.current = true;
+        setRsvps([]);
+        return;
+      }
+
+      const loadedRsvps = snapshot.docs.map(doc => doc.data());
+      setRsvps(loadedRsvps);
+    }, (error) => {
+      console.error("RSVPs sync error:", error);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const proposeTimeSlot = async (dateTime, location, notes) => {
+    if (!user) return;
+    try {
+      const timeSlotRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'timeSlots'));
+      const timeSlotData = {
+        id: timeSlotRef.id,
+        dateTime: new Date(dateTime).toISOString(),
+        location: location || '',
+        proposedBy: user.displayName || user.email || 'Unknown',
+        proposedById: user.uid,
+        proposedAt: new Date().toISOString(),
+        status: 'active',
+        notes: notes || '',
+        linkedMatches: [],
+        history: [{
+          timestamp: new Date().toISOString(),
+          userId: user.uid,
+          userName: user.displayName || user.email || 'Unknown',
+          action: 'proposed',
+          changes: { status: 'active' }
+        }]
+      };
+      await setDoc(timeSlotRef, timeSlotData);
+      return timeSlotRef.id;
+    } catch (e) {
+      console.error("Error proposing time slot:", e);
+      throw e;
+    }
+  };
+
+  const cancelTimeSlot = async (timeSlotId) => {
+    if (!user) return;
+    try {
+      const timeSlotRef = doc(db, 'artifacts', appId, 'public', 'data', 'timeSlots', timeSlotId);
+      const timeSlotSnap = await getDoc(timeSlotRef);
+      if (!timeSlotSnap.exists()) return;
+
+      const timeSlotData = timeSlotSnap.data();
+      const historyEntry = {
+        timestamp: new Date().toISOString(),
+        userId: user.uid,
+        userName: user.displayName || user.email || 'Unknown',
+        action: 'cancelled',
+        changes: { status: 'cancelled' }
+      };
+
+      await setDoc(timeSlotRef, {
+        ...timeSlotData,
+        status: 'cancelled',
+        history: [...(timeSlotData.history || []), historyEntry]
+      });
+    } catch (e) {
+      console.error("Error cancelling time slot:", e);
+      throw e;
+    }
+  };
+
+  const submitRSVP = async (timeSlotId, playerId, status, notes, onBehalfOf = false) => {
+    if (!user) return;
+    try {
+      // Check if RSVP already exists for this player and time slot
+      const existingRSVP = rsvps.find(r => r.timeSlotId === timeSlotId && r.playerId === playerId);
+
+      if (existingRSVP) {
+        // Update existing RSVP
+        const rsvpRef = doc(db, 'artifacts', appId, 'public', 'data', 'rsvps', existingRSVP.id);
+        const rsvpSnap = await getDoc(rsvpRef);
+        if (!rsvpSnap.exists()) return;
+
+        const rsvpData = rsvpSnap.data();
+        const historyEntry = {
+          timestamp: new Date().toISOString(),
+          userId: user.uid,
+          userName: user.displayName || user.email || 'Unknown',
+          previousStatus: rsvpData.status,
+          newStatus: status
+        };
+
+        await setDoc(rsvpRef, {
+          ...rsvpData,
+          status,
+          respondedBy: user.displayName || user.email || 'Unknown',
+          respondedById: user.uid,
+          onBehalfOf,
+          respondedAt: new Date().toISOString(),
+          notes: notes || '',
+          history: [...(rsvpData.history || []), historyEntry]
+        });
+      } else {
+        // Create new RSVP
+        const rsvpRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'rsvps'));
+        const rsvpData = {
+          id: rsvpRef.id,
+          timeSlotId,
+          playerId,
+          status,
+          respondedBy: user.displayName || user.email || 'Unknown',
+          respondedById: user.uid,
+          onBehalfOf,
+          respondedAt: new Date().toISOString(),
+          notes: notes || '',
+          history: [{
+            timestamp: new Date().toISOString(),
+            userId: user.uid,
+            userName: user.displayName || user.email || 'Unknown',
+            previousStatus: null,
+            newStatus: status
+          }]
+        };
+        await setDoc(rsvpRef, rsvpData);
+      }
+    } catch (e) {
+      console.error("Error submitting RSVP:", e);
+      throw e;
+    }
+  };
+
+  const linkMatchToTimeSlot = async (timeSlotId, matchId, shouldLink = true) => {
+    if (!user) return;
+    try {
+      const timeSlotRef = doc(db, 'artifacts', appId, 'public', 'data', 'timeSlots', timeSlotId);
+      const timeSlotSnap = await getDoc(timeSlotRef);
+      if (!timeSlotSnap.exists()) return;
+
+      const timeSlotData = timeSlotSnap.data();
+      const linkedMatches = timeSlotData.linkedMatches || [];
+
+      const updatedMatches = shouldLink
+        ? [...new Set([...linkedMatches, matchId])] // Add match, ensure unique
+        : linkedMatches.filter(id => id !== matchId); // Remove match
+
+      const historyEntry = {
+        timestamp: new Date().toISOString(),
+        userId: user.uid,
+        userName: user.displayName || user.email || 'Unknown',
+        action: shouldLink ? 'match_linked' : 'match_unlinked',
+        changes: { matchId }
+      };
+
+      await setDoc(timeSlotRef, {
+        ...timeSlotData,
+        linkedMatches: updatedMatches,
+        history: [...(timeSlotData.history || []), historyEntry]
+      });
+
+      // Update match's scheduledDate
+      const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', matchId.toString());
+      const matchSnap = await getDoc(matchRef);
+      if (matchSnap.exists()) {
+        const matchData = matchSnap.data();
+        if (shouldLink) {
+          // Set scheduledDate when linking
+          await setDoc(matchRef, {
+            ...matchData,
+            scheduledDate: timeSlotData.dateTime
+          });
+        } else {
+          // Remove scheduledDate when unlinking
+          const { scheduledDate, ...matchDataWithoutSchedule } = matchData;
+          await setDoc(matchRef, matchDataWithoutSchedule);
+        }
+      }
+    } catch (e) {
+      console.error("Error linking match to time slot:", e);
+      throw e;
+    }
+  };
+
+  const getRSVPsForTimeSlot = (timeSlotId) => {
+    return rsvps.filter(r => r.timeSlotId === timeSlotId);
+  };
+
+  const getPlayerRSVP = (timeSlotId, playerId) => {
+    return rsvps.find(r => r.timeSlotId === timeSlotId && r.playerId === playerId);
+  };
+
+  const value = {
+    timeSlots,
+    rsvps,
+    proposeTimeSlot,
+    cancelTimeSlot,
+    submitRSVP,
+    linkMatchToTimeSlot,
+    getRSVPsForTimeSlot,
+    getPlayerRSVP
+  };
+
+  return (
+    <TimeSlotsContext.Provider value={value}>
+      {children}
+    </TimeSlotsContext.Provider>
+  );
+};
+
 // --- Components ---
 
 const Badge = ({ children, className }) => (
@@ -551,6 +810,7 @@ export default function App() {
     switch(activeTab) {
       case 'dashboard': return <Dashboard standings={standings} matches={matches} teams={INITIAL_TEAMS} onMatchClick={setEditingMatch} onViewAllMatches={() => { setMatchesFilter('completed'); setActiveTab('matches'); }} />;
       case 'matches': return <MatchSchedule matches={matches} updateMatch={updateMatch} teams={INITIAL_TEAMS} user={user} playerName={playerName} initialFilter={matchesFilter} />;
+      case 'schedule': return <TimeSlotScheduler matches={matches} />;
       case 'teams': return <TeamsList teams={INITIAL_TEAMS} />;
       case 'rules': return <RulesPage />;
       default: return <Dashboard standings={standings} matches={matches} teams={INITIAL_TEAMS} onMatchClick={setEditingMatch} onViewAllMatches={() => { setMatchesFilter('completed'); setActiveTab('matches'); }} />;
@@ -597,6 +857,7 @@ export default function App() {
 
   return (
     <PlayersProvider user={user}>
+    <TimeSlotsProvider user={user}>
       <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-lime-400 selection:text-slate-900 pb-20 md:pb-0">
         {editingMatch && (
           <ReportModal
@@ -662,6 +923,7 @@ export default function App() {
             <div className="hidden md:flex gap-6 text-sm font-medium">
               <NavBtn active={activeTab === 'dashboard'} onClick={() => handleTabChange('dashboard')} icon={<Activity />}>Dashboard</NavBtn>
               <NavBtn active={activeTab === 'matches'} onClick={() => handleTabChange('matches')} icon={<Calendar />}>Matches</NavBtn>
+              <NavBtn active={activeTab === 'schedule'} onClick={() => handleTabChange('schedule')} icon={<CalendarClock />}>Schedule</NavBtn>
               <NavBtn active={activeTab === 'teams'} onClick={() => handleTabChange('teams')} icon={<Users />}>Teams</NavBtn>
               <NavBtn active={activeTab === 'rules'} onClick={() => handleTabChange('rules')} icon={<Zap />}>Rules</NavBtn>
             </div>
@@ -740,10 +1002,12 @@ export default function App() {
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/90 backdrop-blur-lg border-t border-white/5 flex justify-around p-3 pb-safe z-50">
         <MobileNavBtn active={activeTab === 'dashboard'} onClick={() => handleTabChange('dashboard')} icon={<Activity size={20} />} label="Dash" />
         <MobileNavBtn active={activeTab === 'matches'} onClick={() => handleTabChange('matches')} icon={<Calendar size={20} />} label="Matches" />
+        <MobileNavBtn active={activeTab === 'schedule'} onClick={() => handleTabChange('schedule')} icon={<CalendarClock size={20} />} label="Schedule" />
         <MobileNavBtn active={activeTab === 'teams'} onClick={() => handleTabChange('teams')} icon={<Users size={20} />} label="Teams" />
         <MobileNavBtn active={activeTab === 'rules'} onClick={() => handleTabChange('rules')} icon={<Medal size={20} />} label="Playoffs" />
       </nav>
     </div>
+    </TimeSlotsProvider>
     </PlayersProvider>
   );
 }
@@ -2510,6 +2774,862 @@ const TeamsList = ({ teams }) => {
         ))}
       </div>
     </>
+  );
+};
+
+// --- TIME SLOT SCHEDULING ---
+
+const TimeSlotScheduler = ({ matches }) => {
+  const { timeSlots, proposeTimeSlot } = useTimeSlots();
+  const { getPlayerName } = usePlayers();
+  const [showProposalModal, setShowProposalModal] = useState(false);
+  const [showPastSlots, setShowPastSlots] = useState(false);
+
+  // Filter active time slots and separate by past/upcoming
+  const now = new Date();
+  const activeSlots = timeSlots.filter(slot => slot.status === 'active');
+  const upcomingSlots = activeSlots.filter(slot => new Date(slot.dateTime) >= now);
+  const pastSlots = activeSlots.filter(slot => new Date(slot.dateTime) < now);
+
+  const slotsToDisplay = showPastSlots ? activeSlots : upcomingSlots;
+
+  return (
+    <>
+      {showProposalModal && (
+        <TimeSlotProposalModal
+          onClose={() => setShowProposalModal(false)}
+          onSubmit={proposeTimeSlot}
+        />
+      )}
+
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-black text-white flex items-center gap-2">
+              <CalendarClock className="text-lime-400" size={28} />
+              Schedule
+            </h2>
+            <p className="text-sm text-slate-400 mt-1">
+              Propose play times and RSVP for matches
+            </p>
+          </div>
+          <button
+            onClick={() => setShowProposalModal(true)}
+            className="px-4 py-2 bg-gradient-to-r from-lime-400 to-green-500 hover:from-lime-500 hover:to-green-600 text-slate-900 font-bold rounded-xl shadow-lg shadow-lime-500/20 transition-all duration-200 flex items-center gap-2"
+          >
+            <CalendarClock size={18} />
+            Propose Time
+          </button>
+        </div>
+
+        {/* Filter Toggle */}
+        {pastSlots.length > 0 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowPastSlots(!showPastSlots)}
+              className="text-sm text-slate-400 hover:text-lime-400 transition-colors flex items-center gap-2"
+            >
+              <Filter size={16} />
+              {showPastSlots ? 'Hide' : 'Show'} Past Slots ({pastSlots.length})
+            </button>
+          </div>
+        )}
+
+        {/* Time Slots List */}
+        {slotsToDisplay.length === 0 ? (
+          <Card className="p-12 text-center">
+            <CalendarClock className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-slate-400 mb-2">
+              No {showPastSlots ? '' : 'Upcoming '}Time Slots
+            </h3>
+            <p className="text-slate-500 mb-6">
+              Propose a play time to get started
+            </p>
+            <button
+              onClick={() => setShowProposalModal(true)}
+              className="px-6 py-3 bg-gradient-to-r from-lime-400 to-green-500 hover:from-lime-500 hover:to-green-600 text-slate-900 font-bold rounded-xl shadow-lg transition-all duration-200"
+            >
+              Propose First Time Slot
+            </button>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {slotsToDisplay.map(slot => (
+              <TimeSlotCard
+                key={slot.id}
+                timeSlot={slot}
+                matches={matches}
+                getPlayerName={getPlayerName}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  );
+};
+
+const TimeSlotProposalModal = ({ onClose, onSubmit }) => {
+  const [dateTime, setDateTime] = useState('');
+  const [location, setLocation] = useState('');
+  const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!dateTime) {
+      setError('Please select a date and time');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
+    try {
+      await onSubmit(dateTime, location, notes);
+      onClose();
+    } catch (err) {
+      console.error('Error proposing time slot:', err);
+      setError('Failed to propose time slot. Please try again.');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-slate-800/95 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl max-w-lg w-full p-6 animate-in slide-in-from-bottom-4 duration-300">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-2xl font-black text-white flex items-center gap-2">
+            <CalendarClock className="text-lime-400" size={24} />
+            Propose Time Slot
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors"
+          >
+            <X size={20} className="text-slate-400" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Date & Time *
+            </label>
+            <input
+              type="datetime-local"
+              value={dateTime}
+              onChange={(e) => setDateTime(e.target.value)}
+              className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-lime-400/50 focus:border-lime-400/50 transition-all"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Location
+            </label>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="e.g., Downtown Courts, Main Facility"
+              className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-lime-400/50 focus:border-lime-400/50 transition-all"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Notes
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Additional details about this play time..."
+              rows={3}
+              className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-lime-400/50 focus:border-lime-400/50 transition-all resize-none"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-3 bg-slate-700/50 hover:bg-slate-700 text-white font-medium rounded-xl transition-colors"
+              disabled={saving}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-lime-400 to-green-500 hover:from-lime-500 hover:to-green-600 disabled:from-slate-600 disabled:to-slate-600 text-slate-900 font-bold rounded-xl shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
+            >
+              {saving ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Proposing...
+                </>
+              ) : (
+                'Propose'
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+const TimeSlotCard = ({ timeSlot, matches, getPlayerName }) => {
+  const { getRSVPsForTimeSlot } = useTimeSlots();
+  const [showRSVPModal, setShowRSVPModal] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  const rsvps = getRSVPsForTimeSlot(timeSlot.id);
+  const comingRsvps = rsvps.filter(r => r.status === 'coming');
+  const attendingPlayerIds = comingRsvps.map(r => r.playerId);
+
+  // Calculate playable matches
+  const playableMatches = calculatePlayableMatches(matches, attendingPlayerIds);
+
+  // Calculate missing player impact
+  const missingPlayers = calculateMissingPlayerImpact(matches, attendingPlayerIds, getPlayerName);
+
+  // Format date/time
+  const formatDateTime = (isoString) => {
+    const date = new Date(isoString);
+    const options = {
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    };
+    return date.toLocaleDateString('en-US', options);
+  };
+
+  const isPast = new Date(timeSlot.dateTime) < new Date();
+
+  return (
+    <>
+      {showRSVPModal && (
+        <RSVPModal
+          timeSlot={timeSlot}
+          onClose={() => setShowRSVPModal(false)}
+        />
+      )}
+
+      <Card className={`overflow-hidden ${isPast ? 'opacity-60' : ''}`}>
+        <div className="p-6 space-y-4">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 text-lime-400 font-bold text-lg mb-1">
+                <Calendar size={20} />
+                {formatDateTime(timeSlot.dateTime)}
+              </div>
+              {timeSlot.location && (
+                <div className="text-slate-400 text-sm flex items-center gap-2">
+                  📍 {timeSlot.location}
+                </div>
+              )}
+              <div className="text-slate-500 text-xs mt-2">
+                Proposed by {timeSlot.proposedBy}
+              </div>
+            </div>
+            {isPast && (
+              <Badge className="bg-slate-700/50 text-slate-400">Past</Badge>
+            )}
+          </div>
+
+          {timeSlot.notes && (
+            <div className="text-slate-300 text-sm bg-slate-900/50 rounded-lg p-3 border border-white/5">
+              {timeSlot.notes}
+            </div>
+          )}
+
+          {/* RSVP Summary */}
+          <RSVPSummary
+            rsvps={rsvps}
+            comingRsvps={comingRsvps}
+            getPlayerName={getPlayerName}
+          />
+
+          {/* Playable Matches */}
+          <PlayableMatchesSection
+            playableMatches={playableMatches}
+            timeSlot={timeSlot}
+            totalRsvps={comingRsvps.length}
+          />
+
+          {/* Missing Players */}
+          {missingPlayers.length > 0 && (
+            <MissingPlayersSection
+              missingPlayers={missingPlayers}
+              expanded={expanded}
+              setExpanded={setExpanded}
+            />
+          )}
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={() => setShowRSVPModal(true)}
+              className="flex-1 px-4 py-2 bg-gradient-to-r from-lime-400 to-green-500 hover:from-lime-500 hover:to-green-600 text-slate-900 font-bold rounded-xl shadow-lg transition-all duration-200"
+            >
+              RSVP
+            </button>
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="px-4 py-2 bg-slate-700/50 hover:bg-slate-700 text-white font-medium rounded-xl transition-colors flex items-center gap-2"
+            >
+              {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+              Details
+            </button>
+          </div>
+        </div>
+      </Card>
+    </>
+  );
+};
+
+// Helper function to calculate playable matches
+const calculatePlayableMatches = (matches, attendingPlayerIds) => {
+  const attendingSet = new Set(attendingPlayerIds);
+
+  return matches
+    .filter(m => !m.winner) // Unplayed matches only
+    .filter(m =>
+      attendingSet.has(m.pA1) &&
+      attendingSet.has(m.pA2) &&
+      attendingSet.has(m.pB1) &&
+      attendingSet.has(m.pB2)
+    )
+    .sort((a, b) => a.id - b.id);
+};
+
+// Helper function to calculate missing player impact
+const calculateMissingPlayerImpact = (matches, attendingPlayerIds, getPlayerName) => {
+  const attendingSet = new Set(attendingPlayerIds);
+  const unplayedMatches = matches.filter(m => !m.winner);
+
+  const playerImpact = {};
+
+  unplayedMatches.forEach(match => {
+    const requiredPlayers = [match.pA1, match.pA2, match.pB1, match.pB2];
+    const missingPlayers = requiredPlayers.filter(p => !attendingSet.has(p));
+
+    // Only consider if 1-2 players missing (realistic to recruit)
+    if (missingPlayers.length > 0 && missingPlayers.length <= 2) {
+      missingPlayers.forEach(playerId => {
+        if (!playerImpact[playerId]) {
+          playerImpact[playerId] = {
+            playerId,
+            playerName: getPlayerName(playerId, true),
+            matchCount: 0,
+            matches: []
+          };
+        }
+        playerImpact[playerId].matchCount++;
+        playerImpact[playerId].matches.push(match.id);
+      });
+    }
+  });
+
+  return Object.values(playerImpact)
+    .sort((a, b) => b.matchCount - a.matchCount)
+    .slice(0, 5);
+};
+
+const RSVPSummary = ({ rsvps, comingRsvps, getPlayerName }) => {
+  if (rsvps.length === 0) {
+    return (
+      <div className="bg-slate-900/50 rounded-xl p-4 border border-white/5 text-center">
+        <p className="text-slate-400 text-sm">No RSVPs yet. Be the first!</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-slate-900/50 rounded-xl p-4 border border-white/5">
+      <div className="flex items-center gap-2 mb-3">
+        <Users className="text-lime-400" size={18} />
+        <span className="font-bold text-white">
+          {comingRsvps.length} Coming
+        </span>
+      </div>
+      {comingRsvps.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {comingRsvps.map(rsvp => (
+            <div
+              key={rsvp.id}
+              className="px-3 py-1.5 bg-green-500/20 border border-green-500/30 rounded-lg text-sm flex items-center gap-2"
+              title={rsvp.onBehalfOf ? `RSVP by ${rsvp.respondedBy}` : ''}
+            >
+              <div className="w-2 h-2 rounded-full bg-green-500" />
+              <span className="text-green-300 font-medium">
+                {getPlayerName(rsvp.playerId)}
+              </span>
+              {rsvp.onBehalfOf && (
+                <span className="text-green-500/60 text-xs">👤</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const PlayableMatchesSection = ({ playableMatches, timeSlot, totalRsvps }) => {
+  const { linkMatchToTimeSlot } = useTimeSlots();
+  const { getPlayerName } = usePlayers();
+  const [linking, setLinking] = useState({});
+
+  const handleLinkMatch = async (matchId, shouldLink) => {
+    setLinking({ ...linking, [matchId]: true });
+    try {
+      await linkMatchToTimeSlot(timeSlot.id, matchId, shouldLink);
+    } catch (err) {
+      console.error('Error linking match:', err);
+    } finally {
+      setLinking({ ...linking, [matchId]: false });
+    }
+  };
+
+  return (
+    <div className={`${playableMatches.length > 0 ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-900/50 border-white/10'} border rounded-xl p-4`}>
+      <div className="flex items-center gap-2 mb-3">
+        <Sparkles className={playableMatches.length > 0 ? 'text-green-400' : 'text-slate-500'} size={18} />
+        <span className={`font-bold ${playableMatches.length > 0 ? 'text-green-300' : 'text-slate-400'}`}>
+          {playableMatches.length > 0
+            ? `Can Play ${playableMatches.length} Match${playableMatches.length !== 1 ? 'es' : ''}`
+            : 'Playable Matches'
+          }
+        </span>
+      </div>
+
+      {playableMatches.length === 0 ? (
+        <div className="text-sm text-slate-400">
+          {totalRsvps === 0 ? (
+            <>No RSVPs yet. Add RSVPs to see which matches can be played.</>
+          ) : totalRsvps < 4 ? (
+            <>Need at least 4 players to play a match. Currently {totalRsvps} player{totalRsvps !== 1 ? 's' : ''} coming.</>
+          ) : (
+            <>No complete matches yet. Need all 4 players from the same match to RSVP "coming".</>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {playableMatches.map(match => {
+            const isLinked = timeSlot.linkedMatches?.includes(match.id);
+            return (
+              <div
+                key={match.id}
+                className="bg-slate-900/50 rounded-lg p-3 flex items-center justify-between gap-3"
+              >
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-white">
+                    Match #{match.id}
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    {getPlayerName(match.pA1)} & {getPlayerName(match.pA2)} vs{' '}
+                    {getPlayerName(match.pB1)} & {getPlayerName(match.pB2)}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleLinkMatch(match.id, !isLinked)}
+                  disabled={linking[match.id]}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                    isLinked
+                      ? 'bg-lime-500/20 text-lime-400 hover:bg-lime-500/30'
+                      : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  {linking[match.id] ? '...' : isLinked ? 'Linked' : 'Link'}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const MissingPlayersSection = ({ missingPlayers, expanded, setExpanded }) => {
+  if (missingPlayers.length === 0) return null;
+
+  const getPriorityStars = (count) => {
+    if (count >= 5) return '⭐⭐⭐';
+    if (count >= 3) return '⭐⭐';
+    return '⭐';
+  };
+
+  return (
+    <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Info className="text-orange-400" size={18} />
+        <span className="font-bold text-orange-300">
+          Key Missing Players
+        </span>
+      </div>
+      <div className="space-y-2">
+        {missingPlayers.map((player, idx) => (
+          <div
+            key={player.playerId}
+            className="bg-slate-900/50 rounded-lg p-3"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="text-sm font-medium text-white flex items-center gap-2">
+                  <span className="text-orange-400">{idx + 1}.</span>
+                  {player.playerName}
+                  <span className="text-xs">{getPriorityStars(player.matchCount)}</span>
+                </div>
+                <div className="text-xs text-slate-400">
+                  Would unlock {player.matchCount} match{player.matchCount !== 1 ? 'es' : ''}
+                </div>
+              </div>
+            </div>
+            {expanded && (
+              <div className="mt-2 text-xs text-slate-500">
+                Matches: {player.matches.join(', ')}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const RSVPModal = ({ timeSlot, onClose }) => {
+  const { submitRSVP, getPlayerRSVP } = useTimeSlots();
+  const { players } = usePlayers();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedPlayer, setSelectedPlayer] = useState('');
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [status, setStatus] = useState('coming');
+  const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  // Close autocomplete when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('.player-search-container')) {
+        setShowAutocomplete(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Filter players based on search query
+  const filteredPlayers = useMemo(() => {
+    if (!searchQuery.trim()) return Object.values(players).slice(0, 8);
+    const query = searchQuery.toLowerCase();
+    return Object.values(players)
+      .filter(player => player.name.toLowerCase().includes(query))
+      .slice(0, 8);
+  }, [players, searchQuery]);
+
+  // Get current RSVP for selected player
+  const currentRSVP = selectedPlayer ? getPlayerRSVP(timeSlot.id, selectedPlayer) : null;
+
+  useEffect(() => {
+    if (currentRSVP) {
+      setStatus(currentRSVP.status);
+      setNotes(currentRSVP.notes || '');
+    } else {
+      setStatus('coming');
+      setNotes('');
+    }
+  }, [selectedPlayer, currentRSVP]);
+
+  const handlePlayerSelect = (player) => {
+    setSelectedPlayer(player.id);
+    setSearchQuery(player.name);
+    setShowAutocomplete(false);
+    setSelectedIndex(-1);
+  };
+
+  const handleClearPlayer = () => {
+    setSelectedPlayer('');
+    setSearchQuery('');
+    setShowAutocomplete(false);
+    setSelectedIndex(-1);
+  };
+
+  const handleKeyDown = (e) => {
+    if (!showAutocomplete || filteredPlayers.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex(prev =>
+        prev < filteredPlayers.length - 1 ? prev + 1 : prev
+      );
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex(prev => prev > 0 ? prev - 1 : -1);
+    } else if (e.key === 'Enter' && selectedIndex >= 0) {
+      e.preventDefault();
+      handlePlayerSelect(filteredPlayers[selectedIndex]);
+    } else if (e.key === 'Escape') {
+      setShowAutocomplete(false);
+      setSelectedIndex(-1);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!selectedPlayer) {
+      setError('Please select a player');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
+    try {
+      const onBehalfOf = false;
+      await submitRSVP(timeSlot.id, selectedPlayer, status, notes, onBehalfOf);
+      onClose();
+    } catch (err) {
+      console.error('Error submitting RSVP:', err);
+      setError('Failed to submit RSVP. Please try again.');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-slate-800/95 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl max-w-lg w-full p-6 animate-in slide-in-from-bottom-4 duration-300 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-2xl font-black text-white flex items-center gap-2">
+            <Users className="text-lime-400" size={24} />
+            RSVP
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors"
+          >
+            <X size={20} className="text-slate-400" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Player Search with Autocomplete */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Select Player *
+            </label>
+            <div className="relative player-search-container">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Search for a player..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setShowAutocomplete(true);
+                    setSelectedIndex(-1);
+                    if (!e.target.value) {
+                      setSelectedPlayer('');
+                    }
+                  }}
+                  onFocus={() => setShowAutocomplete(true)}
+                  onKeyDown={handleKeyDown}
+                  className="w-full pl-10 pr-10 py-3 bg-slate-900/50 border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:border-lime-500 focus:outline-none focus:ring-2 focus:ring-lime-500/20 transition-colors"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={handleClearPlayer}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-full transition-colors"
+                  >
+                    <X className="w-4 h-4 text-slate-400" />
+                  </button>
+                )}
+              </div>
+
+              {/* Autocomplete Dropdown */}
+              {showAutocomplete && filteredPlayers.length > 0 && (
+                <div className="absolute top-full mt-2 w-full bg-slate-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden z-10 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="max-h-64 overflow-y-auto">
+                    {filteredPlayers.map((player, idx) => {
+                      const query = searchQuery.toLowerCase();
+                      const playerLower = player.name.toLowerCase();
+                      const matchIndex = playerLower.indexOf(query);
+
+                      return (
+                        <button
+                          key={player.id}
+                          type="button"
+                          onClick={() => handlePlayerSelect(player)}
+                          onMouseEnter={() => setSelectedIndex(idx)}
+                          className={`w-full px-4 py-3 text-left text-sm text-white transition-colors flex items-center gap-3 ${
+                            idx === selectedIndex
+                              ? 'bg-lime-500/20 border-l-2 border-lime-500'
+                              : 'hover:bg-lime-500/10'
+                          }`}
+                        >
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-lime-400 to-green-500 flex items-center justify-center text-slate-900 font-bold text-sm">
+                            {player.name[0].toUpperCase()}
+                          </div>
+                          <span>
+                            {matchIndex >= 0 && query ? (
+                              <>
+                                {player.name.substring(0, matchIndex)}
+                                <span className="bg-lime-400/30 text-lime-300 font-semibold">
+                                  {player.name.substring(matchIndex, matchIndex + query.length)}
+                                </span>
+                                {player.name.substring(matchIndex + query.length)}
+                              </>
+                            ) : (
+                              player.name
+                            )}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {currentRSVP && (
+            <div className="bg-slate-900/50 border border-white/10 rounded-xl p-3 text-sm text-slate-300">
+              Current RSVP: <span className={`font-bold ${currentRSVP.status === 'coming' ? 'text-green-400' : 'text-red-400'}`}>
+                {currentRSVP.status === 'coming' ? 'Coming' : 'Not Coming'}
+              </span>
+              <div className="text-xs text-slate-500 mt-1">
+                Responded by {currentRSVP.respondedBy}
+              </div>
+            </div>
+          )}
+
+          {/* Status Toggle Buttons */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-3">
+              Are you coming? *
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setStatus('coming')}
+                className={`relative px-6 py-4 rounded-xl font-bold text-lg transition-all transform active:scale-95 ${
+                  status === 'coming'
+                    ? 'bg-gradient-to-br from-green-400 to-green-600 text-white shadow-lg shadow-green-500/30 scale-105'
+                    : 'bg-slate-900/50 text-slate-400 border border-white/10 hover:bg-slate-900/70'
+                }`}
+              >
+                <div className="flex flex-col items-center gap-2">
+                  <div className={`text-3xl ${status === 'coming' ? 'animate-bounce' : ''}`}>✅</div>
+                  <span>Coming</span>
+                </div>
+                {status === 'coming' && (
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-green-400/20 to-transparent animate-pulse" />
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStatus('not_coming')}
+                className={`relative px-6 py-4 rounded-xl font-bold text-lg transition-all transform active:scale-95 ${
+                  status === 'not_coming'
+                    ? 'bg-gradient-to-br from-red-400 to-red-600 text-white shadow-lg shadow-red-500/30 scale-105'
+                    : 'bg-slate-900/50 text-slate-400 border border-white/10 hover:bg-slate-900/70'
+                }`}
+              >
+                <div className="flex flex-col items-center gap-2">
+                  <div className="text-3xl">❌</div>
+                  <span>Not Coming</span>
+                </div>
+                {status === 'not_coming' && (
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-red-400/20 to-transparent animate-pulse" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Notes (Optional)
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Any additional notes..."
+              rows={3}
+              className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-lime-400/50 focus:border-lime-400/50 transition-all resize-none"
+            />
+          </div>
+
+          {/* History */}
+          {currentRSVP && currentRSVP.history && currentRSVP.history.length > 0 && (
+            <div className="bg-slate-900/50 border border-white/10 rounded-xl p-3">
+              <div className="text-xs font-medium text-slate-400 mb-2">History</div>
+              <div className="space-y-1 text-xs text-slate-500">
+                {currentRSVP.history.slice(-3).reverse().map((entry, idx) => (
+                  <div key={idx}>
+                    {entry.userName} changed to {entry.newStatus} • {new Date(entry.timestamp).toLocaleDateString()}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-3 bg-slate-700/50 hover:bg-slate-700 text-white font-medium rounded-xl transition-colors"
+              disabled={saving}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving || !selectedPlayer}
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-lime-400 to-green-500 hover:from-lime-500 hover:to-green-600 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed text-slate-900 font-bold rounded-xl shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
+            >
+              {saving ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                'Submit RSVP'
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 };
 
