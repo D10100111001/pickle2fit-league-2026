@@ -240,8 +240,16 @@ export default function App() {
       }
     });
 
-    // Sort by Wins, then win %
-    const sorted = Object.values(stats).sort((a, b) => b.wins - a.wins);
+    // Sort by Win Rate (win %), then by wins as tiebreaker
+    const sorted = Object.values(stats).sort((a, b) => {
+      const winRateA = a.played > 0 ? a.wins / a.played : 0;
+      const winRateB = b.played > 0 ? b.wins / b.played : 0;
+      if (winRateB !== winRateA) {
+        return winRateB - winRateA;
+      }
+      // Tiebreaker: total wins
+      return b.wins - a.wins;
+    });
     setStandings(sorted);
   };
 

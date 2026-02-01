@@ -144,25 +144,30 @@ const Dashboard: React.FC<DashboardProps> = ({ standings, matches, teams, onMatc
               <tr>
                 <th className="px-4 py-3">Rank</th>
                 <th className="px-4 py-3">Team</th>
+                <th className="px-4 py-3 text-center">W%</th>
                 <th className="px-4 py-3 text-center">W</th>
                 <th className="px-4 py-3 text-center">L</th>
                 <th className="px-4 py-3 text-center">Flex</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {standings.map((team, idx) => (
-                <tr key={team.id} className="hover:bg-white/5 transition-colors">
-                  <td className="px-4 py-3 font-bold text-slate-500">#{idx + 1}</td>
-                  <td className="px-4 py-3 font-semibold text-white">{team.name}</td>
-                  <td className="px-4 py-3 text-center text-lime-400 font-bold">{team.wins}</td>
-                  <td className="px-4 py-3 text-center text-slate-400">{team.losses}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`inline-block px-2 rounded ${team.flexUsed >= 8 ? 'bg-red-500/20 text-red-400' : 'bg-slate-700 text-slate-300'}`}>
-                      {team.flexUsed}/10
-                    </span>
-                  </td>
-                </tr>
-              ))}
+              {standings.map((team, idx) => {
+                const winRate = team.played > 0 ? (team.wins / team.played * 100).toFixed(0) : '0';
+                return (
+                  <tr key={team.id} className="hover:bg-white/5 transition-colors">
+                    <td className="px-4 py-3 font-bold text-slate-500">#{idx + 1}</td>
+                    <td className="px-4 py-3 font-semibold text-white">{team.name}</td>
+                    <td className="px-4 py-3 text-center text-lime-400 font-bold">{winRate}%</td>
+                    <td className="px-4 py-3 text-center text-slate-400">{team.wins}</td>
+                    <td className="px-4 py-3 text-center text-slate-400">{team.losses}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`inline-block px-2 rounded ${team.flexUsed >= 8 ? 'bg-red-500/20 text-red-400' : 'bg-slate-700 text-slate-300'}`}>
+                        {team.flexUsed}/10
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
