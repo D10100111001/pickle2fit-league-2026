@@ -12,7 +12,7 @@ interface MatchScheduleProps {
   teams: Team[];
   user: User | null;
   playerName: string | null;
-  initialFilter?: 'all' | 'completed' | 'upcoming';
+  initialFilter?: 'all' | 'completed' | 'upcoming' | 'flexed';
   ReportModal?: React.ComponentType<ReportModalProps>;
 }
 
@@ -30,7 +30,7 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
   const [selectedPlayers, setSelectedPlayers] = useState<PlayerId[]>([]);
   const [editingMatch, setEditingMatch] = useState<Match | null>(null);
   const [sortBy, setSortBy] = useState<'id' | 'date' | 'status'>('id');
-  const [completionFilter, setCompletionFilter] = useState<'all' | 'completed' | 'upcoming'>(initialFilter);
+  const [completionFilter, setCompletionFilter] = useState<'all' | 'completed' | 'upcoming' | 'flexed'>(initialFilter === 'flexed' ? 'flexed' : initialFilter);
 
   // Get all unique players, filtered by team if selected
   const allPlayers = useMemo((): Player[] => {
@@ -48,6 +48,10 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
     .filter(m => {
       if (completionFilter === 'completed' && !m.winner) return false;
       if (completionFilter === 'upcoming' && m.winner) return false;
+      if (completionFilter === 'flexed') {
+        const isFlexed = m.isFlexA || m.isFlexB;
+        if (!isFlexed) return false;
+      }
 
       const teamMatch = filterTeam === 'All' || m.teamA === filterTeam || m.teamB === filterTeam;
 
@@ -147,6 +151,12 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${completionFilter === 'upcoming' ? 'bg-lime-500/20 text-lime-400 border border-lime-500/30' : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'}`}
           >
             Upcoming
+          </button>
+          <button
+            onClick={() => setCompletionFilter('flexed')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${completionFilter === 'flexed' ? 'bg-pink-500/20 text-pink-400 border border-pink-500/30' : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'}`}
+          >
+            Flexed
           </button>
         </div>
       </div>

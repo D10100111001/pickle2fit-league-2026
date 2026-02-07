@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState } from 'react';
-import { X, Edit3, Users, Calendar, ChevronUp, ChevronDown, Trophy, Activity, ChevronRight, Save, Trash2 } from 'lucide-react';
+import { X, Edit3, Users, Calendar, ChevronUp, ChevronDown, Trophy, Activity, ChevronRight, Save, Trash2, RotateCcw } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { usePlayers } from '../providers';
 import { Badge } from '../common';
@@ -28,19 +28,25 @@ const ReportModal: React.FC<ReportModalProps> = ({ match, onClose, onSave, teams
   const [pB1, setPB1] = useState(match.pB1);
   const [pB2, setPB2] = useState(match.pB2);
 
-  // Track which players have been changed from original
+  // Track which players have been changed from ORIGINAL schedule
+  // Fallback to current if original not set (backward compatibility)
+  const originalPA1 = match.originalPA1 || match.pA1;
+  const originalPA2 = match.originalPA2 || match.pA2;
+  const originalPB1 = match.originalPB1 || match.pB1;
+  const originalPB2 = match.originalPB2 || match.pB2;
+
   const changedPlayers = [];
-  if (pA1 !== match.pA1) changedPlayers.push('pA1');
-  if (pA2 !== match.pA2) changedPlayers.push('pA2');
-  if (pB1 !== match.pB1) changedPlayers.push('pB1');
-  if (pB2 !== match.pB2) changedPlayers.push('pB2');
+  if (pA1 !== originalPA1) changedPlayers.push('pA1');
+  if (pA2 !== originalPA2) changedPlayers.push('pA2');
+  if (pB1 !== originalPB1) changedPlayers.push('pB1');
+  if (pB2 !== originalPB2) changedPlayers.push('pB2');
 
   const numChanges = changedPlayers.length;
   const hasMaxChanges = numChanges >= 1;
 
-  // Determine which team has the flex
-  const teamAChanged = pA1 !== match.pA1 || pA2 !== match.pA2;
-  const teamBChanged = pB1 !== match.pB1 || pB2 !== match.pB2;
+  // Determine which team has the flex (compared to ORIGINAL schedule)
+  const teamAChanged = pA1 !== originalPA1 || pA2 !== originalPA2;
+  const teamBChanged = pB1 !== originalPB1 || pB2 !== originalPB2;
 
   const checkFlexA = teamAChanged;
   const checkFlexB = teamBChanged;
@@ -77,11 +83,11 @@ const ReportModal: React.FC<ReportModalProps> = ({ match, onClose, onSave, teams
       historyEntry.changes.scheduledDate = { from: match.scheduledDate, to: scheduledDate || null };
     }
     if (match.pA1 !== pA1 || match.pA2 !== pA2) {
-      const flexNote = checkFlexA ? ' (Flex Used)' : '';
+      const flexNote = checkFlexA ? ' (Flex Used)' : (match.isFlexA && !checkFlexA ? ' (Flex Removed)' : '');
       historyEntry.changes.teamAPlayers = { from: `${match.pA1}, ${match.pA2}`, to: `${pA1}, ${pA2}${flexNote}` };
     }
     if (match.pB1 !== pB1 || match.pB2 !== pB2) {
-      const flexNote = checkFlexB ? ' (Flex Used)' : '';
+      const flexNote = checkFlexB ? ' (Flex Used)' : (match.isFlexB && !checkFlexB ? ' (Flex Removed)' : '');
       historyEntry.changes.teamBPlayers = { from: `${match.pB1}, ${match.pB2}`, to: `${pB1}, ${pB2}${flexNote}` };
     }
 
@@ -334,7 +340,22 @@ const ReportModal: React.FC<ReportModalProps> = ({ match, onClose, onSave, teams
                     <div className={`w-3 h-3 rounded-full bg-gradient-to-br ${teamAData?.color || 'from-lime-400 to-green-500'}`}></div>
                     <span className="font-bold text-sm text-white">{teamAData?.name || match.teamA}</span>
                   </div>
-                  {checkFlexA && <Badge className="bg-pink-500/20 text-pink-400 text-[10px]">Flex</Badge>}
+                  <div className="flex items-center gap-2">
+                    {checkFlexA && <Badge className="bg-pink-500/20 text-pink-400 text-[10px]">Flex</Badge>}
+                    {checkFlexA && (
+                      <button
+                        onClick={() => {
+                          setPA1(originalPA1);
+                          setPA2(originalPA2);
+                        }}
+                        className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 bg-blue-500/10 hover:bg-blue-500/20 px-2 py-1 rounded transition-colors"
+                        title="Reset to original schedule"
+                      >
+                        <RotateCcw size={10} />
+                        Reset
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <div className="space-y-1">
@@ -379,7 +400,22 @@ const ReportModal: React.FC<ReportModalProps> = ({ match, onClose, onSave, teams
                     <div className={`w-3 h-3 rounded-full bg-gradient-to-br ${teamBData?.color || 'from-orange-400 to-red-500'}`}></div>
                     <span className="font-bold text-sm text-white">{teamBData?.name || match.teamB}</span>
                   </div>
-                  {checkFlexB && <Badge className="bg-pink-500/20 text-pink-400 text-[10px]">Flex</Badge>}
+                  <div className="flex items-center gap-2">
+                    {checkFlexB && <Badge className="bg-pink-500/20 text-pink-400 text-[10px]">Flex</Badge>}
+                    {checkFlexB && (
+                      <button
+                        onClick={() => {
+                          setPB1(originalPB1);
+                          setPB2(originalPB2);
+                        }}
+                        className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 bg-blue-500/10 hover:bg-blue-500/20 px-2 py-1 rounded transition-colors"
+                        title="Reset to original schedule"
+                      >
+                        <RotateCcw size={10} />
+                        Reset
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <div className="space-y-1">

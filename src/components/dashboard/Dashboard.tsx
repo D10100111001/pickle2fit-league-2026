@@ -2,6 +2,7 @@ import { Calendar, Activity, Crown, ChevronRight } from 'lucide-react';
 import { usePlayers } from '../providers';
 import { Badge, Card } from '../common';
 import { Match, Team } from '../../types';
+import PlayerStandings from './PlayerStandings';
 
 interface DashboardProps {
   standings: Array<{
@@ -172,6 +173,16 @@ const Dashboard: React.FC<DashboardProps> = ({ standings, matches, teams, onMatc
           </table>
         </div>
       </Card>
+
+      {/* Player Standings */}
+      <PlayerStandings
+        matches={matches}
+        teams={teams}
+        limit={5}
+        showViewAll={true}
+        onViewAll={onViewAllMatches}
+        enableSorting={true}
+      />
 
       <div className="grid md:grid-cols-2 gap-4">
         {/* Upcoming */}

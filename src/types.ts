@@ -1,5 +1,5 @@
 // Firebase Auth types
-import { User } from 'firebase/auth';
+import { User } from "firebase/auth";
 
 // Player types
 export interface Player {
@@ -45,7 +45,7 @@ export interface MatchHistoryEntry {
   changes: MatchHistoryChange;
 }
 
-export interface Match {
+export interface MatchSchedule {
   id: number;
   teamA: string;
   pA1: PlayerId;
@@ -53,8 +53,16 @@ export interface Match {
   teamB: string;
   pB1: PlayerId;
   pB2: PlayerId;
-  winner: string | null;
-  score: string;
+}
+
+export interface Match extends MatchSchedule {
+  // Original schedule - computed at seed/load time, never modified
+  originalPA1?: PlayerId;
+  originalPA2?: PlayerId;
+  originalPB1?: PlayerId;
+  originalPB2?: PlayerId;
+  winner?: string | null;
+  score?: string;
   isFlex?: boolean;
   isFlexA?: boolean;
   isFlexB?: boolean;
@@ -71,7 +79,7 @@ export interface RSVP {
   id: string;
   timeSlotId: string;
   playerId: PlayerId;
-  status: 'coming' | 'not_coming';
+  status: "coming" | "not_coming";
   notes?: string;
   respondedAt: string;
   respondedBy: string;
@@ -85,7 +93,7 @@ export interface TimeSlot {
   dateTime: string;
   location?: string;
   notes?: string;
-  status: 'active' | 'cancelled';
+  status: "active" | "cancelled";
   proposedBy: string;
   proposedById: string;
   proposedAt: string;
@@ -103,18 +111,31 @@ export interface TimeSlotsContextValue {
   timeSlots: TimeSlot[];
   rsvps: RSVP[];
   user: User | null;
-  proposeTimeSlot: (dateTime: string, location: string, notes: string) => Promise<void>;
-  updateTimeSlot: (slotId: string, dateTime: string, location: string, notes: string) => Promise<void>;
+  proposeTimeSlot: (
+    dateTime: string,
+    location: string,
+    notes: string
+  ) => Promise<void>;
+  updateTimeSlot: (
+    slotId: string,
+    dateTime: string,
+    location: string,
+    notes: string
+  ) => Promise<void>;
   cancelTimeSlot: (slotId: string) => Promise<void>;
   deleteTimeSlot: (slotId: string) => Promise<void>;
   submitRSVP: (
     timeSlotId: string,
     playerId: PlayerId,
-    status: 'coming' | 'not_coming',
+    status: "coming" | "not_coming",
     notes: string,
     onBehalfOf: boolean
   ) => Promise<void>;
-  linkMatchToTimeSlot: (timeSlotId: string, matchId: number, shouldLink: boolean) => Promise<void>;
+  linkMatchToTimeSlot: (
+    timeSlotId: string,
+    matchId: number,
+    shouldLink: boolean
+  ) => Promise<void>;
   getRSVPsForTimeSlot: (timeSlotId: string) => RSVP[];
   getPlayerRSVP: (timeSlotId: string, playerId: PlayerId) => RSVP | undefined;
 }
@@ -155,7 +176,7 @@ export interface MatchScheduleProps {
   teams: Team[];
   user: User | null;
   playerName: string | null;
-  initialFilter?: 'all' | 'completed' | 'upcoming';
+  initialFilter?: "all" | "completed" | "upcoming" | "flexed";
   ReportModal: React.ComponentType<ReportModalProps>;
 }
 
