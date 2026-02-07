@@ -14,9 +14,24 @@ export const TimeSlotScheduler = ({ matches }) => {
 
   // Filter active time slots and separate by past/upcoming
   const now = new Date();
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date(now);
+  todayEnd.setHours(23, 59, 59, 999);
+
   const activeSlots = timeSlots.filter(slot => slot.status === 'active');
-  const upcomingSlots = activeSlots.filter(slot => new Date(slot.dateTime) >= now);
-  const pastSlots = activeSlots.filter(slot => new Date(slot.dateTime) < now);
+
+  // Keep all slots from today (even if they've passed) and future slots
+  const upcomingSlots = activeSlots.filter(slot => {
+    const slotDate = new Date(slot.dateTime);
+    return slotDate >= todayStart;
+  });
+
+  // Past slots are only from previous days
+  const pastSlots = activeSlots.filter(slot => {
+    const slotDate = new Date(slot.dateTime);
+    return slotDate < todayStart;
+  });
 
   const slotsToDisplay = showPastSlots ? activeSlots : upcomingSlots;
 

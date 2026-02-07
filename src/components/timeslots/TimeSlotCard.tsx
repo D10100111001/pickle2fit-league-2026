@@ -41,7 +41,13 @@ export const TimeSlotCard = ({ timeSlot, matches, getPlayerName, updateTimeSlot,
     return date.toLocaleDateString('en-US', options);
   };
 
-  const isPast = new Date(timeSlot.dateTime) < new Date();
+  // Only mark as "past" if it's from a previous day, not just if the time has passed today
+  const now = new Date();
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+  const slotDate = new Date(timeSlot.dateTime);
+  const isPast = slotDate < todayStart;
+
   const canEdit = user && user.uid === timeSlot.proposedById;
 
   const handleDelete = async () => {
