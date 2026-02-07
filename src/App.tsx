@@ -329,13 +329,34 @@ export default function App() {
     setStandings(sorted);
   };
 
+  // Deep clean function to remove undefined values recursively
+  const deepClean = (obj: any): any => {
+    if (obj === null || obj === undefined) {
+      return null;
+    }
+
+    if (Array.isArray(obj)) {
+      return obj.map(item => deepClean(item));
+    }
+
+    if (typeof obj === 'object') {
+      const cleaned: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (value !== undefined) {
+          cleaned[key] = deepClean(value);
+        }
+      }
+      return cleaned;
+    }
+
+    return obj;
+  };
+
   const updateMatch = async (id: number, data: Partial<Match>) => {
     if (!user) return;
     try {
-      // Filter out undefined values - Firestore doesn't accept them
-      const cleanData = Object.fromEntries(
-        Object.entries(data).filter(([_, value]) => value !== undefined)
-      );
+      // Deep clean to remove all undefined values (including nested)
+      const cleanData = deepClean(data);
 
       const matchRef = doc(
         db,
