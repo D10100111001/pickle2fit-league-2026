@@ -63,7 +63,6 @@ export interface Match extends MatchSchedule {
   originalPB2?: PlayerId;
   winner?: string | null;
   score?: string;
-  isFlex?: boolean;
   isFlexA?: boolean;
   isFlexB?: boolean;
   scheduledDate: string | null;

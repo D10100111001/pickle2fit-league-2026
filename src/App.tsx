@@ -231,7 +231,7 @@ export default function App() {
               match.id.toString()
             );
             // Compute original fields from current players at seed time
-            const matchWithOriginals = {
+            const matchWithOriginals: Match = {
               ...match,
               originalPA1: match.pA1,
               originalPA2: match.pA2,
@@ -239,7 +239,6 @@ export default function App() {
               originalPB2: match.pB2,
               winner: null,
               score: "",
-              isFlex: false,
               scheduledDate: null,
               reportedDate: null,
               reportedBy: null,
@@ -256,14 +255,12 @@ export default function App() {
         const loadedMatches = snapshot.docs.map((doc) => {
           const match = doc.data() as Match;
           // Backward compatibility: populate original fields from seed if they don't exist
-          if (!match.originalPA1) {
+          if (!match.originalPA1 && match.id > 0 && match.id <= SEEDED_MATCHES.length) {
             const seedMatch = SEEDED_MATCHES[match.id - 1];
-            if (seedMatch) {
-              match.originalPA1 = seedMatch.pA1;
-              match.originalPA2 = seedMatch.pA2;
-              match.originalPB1 = seedMatch.pB1;
-              match.originalPB2 = seedMatch.pB2;
-            }
+            match.originalPA1 = seedMatch.pA1;
+            match.originalPA2 = seedMatch.pA2;
+            match.originalPB1 = seedMatch.pB1;
+            match.originalPB2 = seedMatch.pB2;
           }
           return match;
         });
@@ -335,6 +332,11 @@ export default function App() {
   const updateMatch = async (id: number, data: Partial<Match>) => {
     if (!user) return;
     try {
+      // Filter out undefined values - Firestore doesn't accept them
+      const cleanData = Object.fromEntries(
+        Object.entries(data).filter(([_, value]) => value !== undefined)
+      );
+
       const matchRef = doc(
         db,
         "artifacts",
@@ -344,7 +346,7 @@ export default function App() {
         "matches",
         id.toString()
       );
-      await setDoc(matchRef, data, { merge: true });
+      await setDoc(matchRef, cleanData, { merge: true });
     } catch (e) {
       console.error("Error updating match:", e);
     }
