@@ -43,6 +43,7 @@ import { RulesPage } from "./components/rules";
 import { PlayerStandingsPage } from "./components/players";
 import { INITIAL_TEAMS, SEEDED_MATCHES } from "./constants";
 import { Match } from "./types";
+import { isTeamAFlex, isTeamBFlex, getMatchWinner } from "./utils/matchUtils";
 
 /**
  * Pickle2Fit League 2026
@@ -218,7 +219,7 @@ export default function App() {
         // Auto-Seed Database if empty
         if (snapshot.empty && !initialized.current) {
           initialized.current = true;
-          // Batch write the initial seed data with computed original fields
+          // Batch write the initial seed data with original player fields
           const batch = writeBatch(db);
           SEEDED_MATCHES.forEach((match) => {
             const ref = doc(
@@ -230,15 +231,13 @@ export default function App() {
               "matches",
               match.id.toString()
             );
-            // Compute original fields from current players at seed time
+            // Set original fields from current players at seed time
             const matchWithOriginals: Match = {
               ...match,
               originalPA1: match.pA1,
               originalPA2: match.pA2,
               originalPB1: match.pB1,
               originalPB2: match.pB2,
-              winner: null,
-              score: "",
               scheduledDate: null,
               reportedDate: null,
               reportedBy: null,
@@ -252,18 +251,36 @@ export default function App() {
           return;
         }
 
-        const loadedMatches = snapshot.docs.map((doc) => {
-          const match = doc.data() as Match;
+        const matchesToUpdate: Match[] = [];
+        const loadedMatches = snapshot.docs.map((docSnapshot) => {
+          const match = docSnapshot.data() as Match;
           // Backward compatibility: populate original fields from seed if they don't exist
+          // This handles old data before the refactor
           if (!match.originalPA1 && match.id > 0 && match.id <= SEEDED_MATCHES.length) {
             const seedMatch = SEEDED_MATCHES[match.id - 1];
             match.originalPA1 = seedMatch.pA1;
             match.originalPA2 = seedMatch.pA2;
             match.originalPB1 = seedMatch.pB1;
             match.originalPB2 = seedMatch.pB2;
+            matchesToUpdate.push(match);
           }
           return match;
         });
+
+        // Batch update all matches that need original fields
+        if (matchesToUpdate.length > 0) {
+          const batch = writeBatch(db);
+          matchesToUpdate.forEach((match) => {
+            const matchRef = doc(db, "artifacts", appId, "public", "data", "matches", match.id.toString());
+            batch.update(matchRef, {
+              originalPA1: match.originalPA1,
+              originalPA2: match.originalPA2,
+              originalPB1: match.originalPB1,
+              originalPB2: match.originalPB2,
+            });
+          });
+          batch.commit().catch(err => console.error("Error batch updating original fields:", err));
+        }
         // Sort in memory (Rule 2: Avoid complex queries)
         loadedMatches.sort((a, b) => a.id - b.id);
 
@@ -298,11 +315,12 @@ export default function App() {
     });
 
     matches.forEach((m) => {
-      if (m.winner) {
+      const winner = getMatchWinner(m);
+      if (winner) {
         if (stats[m.teamA]) stats[m.teamA].played += 1;
         if (stats[m.teamB]) stats[m.teamB].played += 1;
 
-        if (m.winner === m.teamA && stats[m.teamA]) {
+        if (winner === m.teamA && stats[m.teamA]) {
           stats[m.teamA].wins += 1;
           if (stats[m.teamB]) stats[m.teamB].losses += 1;
         } else if (stats[m.teamB]) {
@@ -310,9 +328,9 @@ export default function App() {
           if (stats[m.teamA]) stats[m.teamA].losses += 1;
         }
 
-        // Flex Logic
-        if (m.isFlexA && stats[m.teamA]) stats[m.teamA].flexUsed += 1;
-        if (m.isFlexB && stats[m.teamB]) stats[m.teamB].flexUsed += 1;
+        // Flex Logic - computed from player assignments
+        if (isTeamAFlex(m) && stats[m.teamA]) stats[m.teamA].flexUsed += 1;
+        if (isTeamBFlex(m) && stats[m.teamB]) stats[m.teamB].flexUsed += 1;
       }
     });
 

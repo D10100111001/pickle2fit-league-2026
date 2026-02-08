@@ -3,6 +3,7 @@ import { usePlayers } from '../providers';
 import { Badge, Card } from '../common';
 import { Match, Team } from '../../types';
 import { useState } from 'react';
+import { getMatchWinner, isTeamAFlex, isTeamBFlex } from '../../utils/matchUtils';
 
 export interface PlayerStats {
   playerId: string;
@@ -62,7 +63,8 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({
 
     // Process completed matches
     matches.forEach(match => {
-      if (!match.winner) return; // Skip unplayed matches
+      const winner = getMatchWinner(match);
+      if (!winner) return; // Skip unplayed matches
 
       const teamAPlayers = [match.pA1, match.pA2];
       const teamBPlayers = [match.pB1, match.pB2];
@@ -99,8 +101,8 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({
         const playerInTeamA = teamAPlayers.includes(playerId);
         const playerInTeamB = teamBPlayers.includes(playerId);
 
-        if ((playerInTeamA && match.winner === match.teamA) ||
-            (playerInTeamB && match.winner === match.teamB)) {
+        if ((playerInTeamA && winner === match.teamA) ||
+            (playerInTeamB && winner === match.teamB)) {
           stats[playerId].wins += 1;
         } else {
           stats[playerId].losses += 1;
@@ -114,7 +116,7 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({
         }
 
         // Check if this was a flex game for the player
-        if (playerInTeamA && match.isFlexA) {
+        if (playerInTeamA && isTeamAFlex(match)) {
           // Check if player was a flex (not original player)
           const isOriginalA1 = match.originalPA1 === playerId;
           const isOriginalA2 = match.originalPA2 === playerId;
@@ -122,7 +124,7 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({
             stats[playerId].flexGames += 1;
           }
         }
-        if (playerInTeamB && match.isFlexB) {
+        if (playerInTeamB && isTeamBFlex(match)) {
           // Check if player was a flex (not original player)
           const isOriginalB1 = match.originalPB1 === playerId;
           const isOriginalB2 = match.originalPB2 === playerId;

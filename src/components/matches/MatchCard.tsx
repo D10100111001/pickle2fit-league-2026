@@ -2,6 +2,7 @@ import { Calendar, Edit3 } from 'lucide-react';
 import { usePlayers } from '../providers';
 import { Badge } from '../common';
 import { Match, Team, PlayerId } from '../../types';
+import { getMatchScore, getMatchWinner, isTeamAFlex, isTeamBFlex } from '../../utils/matchUtils';
 
 interface MatchCardProps {
   match: Match;
@@ -13,15 +14,21 @@ interface MatchCardProps {
 
 const MatchCard: React.FC<MatchCardProps> = ({ match, teams, searchQuery = '', highlightedPlayerIds = [], onEdit }) => {
   const { getPlayerName } = usePlayers();
-  const isPlayed = !!match.winner;
+  const matchWinner = getMatchWinner(match);
+  const matchScore = getMatchScore(match);
+  const isPlayed = !!matchWinner;
   const teamAData = teams.find(t => t.id === match.teamA);
   const teamBData = teams.find(t => t.id === match.teamB);
 
-  // Fallback to current if original not set (backward compatibility)
-  const originalPA1 = match.originalPA1 || match.pA1;
-  const originalPA2 = match.originalPA2 || match.pA2;
-  const originalPB1 = match.originalPB1 || match.pB1;
-  const originalPB2 = match.originalPB2 || match.pB2;
+  // Original player assignments
+  const originalPA1 = match.originalPA1;
+  const originalPA2 = match.originalPA2;
+  const originalPB1 = match.originalPB1;
+  const originalPB2 = match.originalPB2;
+
+  // Compute flex status
+  const teamAUsedFlex = isTeamAFlex(match);
+  const teamBUsedFlex = isTeamBFlex(match);
 
   // Determine match status
   const getMatchStatus = () => {
@@ -132,24 +139,24 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, teams, searchQuery = '', h
       <div className="flex items-center justify-between gap-3">
         {/* Team A */}
         <div className="flex-1">
-          <div className={`font-bold text-lg ${match.winner === match.teamA ? 'text-lime-400' : 'text-white'}`}>
+          <div className={`font-bold text-lg ${matchWinner === match.teamA ? 'text-lime-400' : 'text-white'}`}>
             {teamAData?.name || match.teamA}
           </div>
           <div className="text-xs text-slate-400 flex flex-col mt-1 gap-0.5">
             <div>
-              {match.isFlexA && match.pA1 !== originalPA1 && (
+              {teamAUsedFlex && match.pA1 !== originalPA1 && (
                 <span className="line-through text-slate-600 mr-1">{renderPlayerName(originalPA1)}</span>
               )}
-              <span className={match.isFlexA && match.pA1 !== originalPA1 ? 'text-pink-400' : ''}>{renderPlayerName(match.pA1)}</span>
+              <span className={teamAUsedFlex && match.pA1 !== originalPA1 ? 'text-pink-400' : ''}>{renderPlayerName(match.pA1)}</span>
             </div>
             <div>
-              {match.isFlexA && match.pA2 !== originalPA2 && (
+              {teamAUsedFlex && match.pA2 !== originalPA2 && (
                 <span className="line-through text-slate-600 mr-1">{renderPlayerName(originalPA2)}</span>
               )}
-              <span className={match.isFlexA && match.pA2 !== originalPA2 ? 'text-pink-400' : ''}>{renderPlayerName(match.pA2)}</span>
+              <span className={teamAUsedFlex && match.pA2 !== originalPA2 ? 'text-pink-400' : ''}>{renderPlayerName(match.pA2)}</span>
             </div>
           </div>
-          {match.isFlexA && <span className="text-[10px] text-pink-400 border border-pink-500/30 px-1 rounded mt-1 inline-block">Flex Used</span>}
+          {teamAUsedFlex && <span className="text-[10px] text-pink-400 border border-pink-500/30 px-1 rounded mt-1 inline-block">Flex Used</span>}
         </div>
 
         {/* VS / Score */}
@@ -157,7 +164,7 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, teams, searchQuery = '', h
           {isPlayed ? (
             <div className="flex flex-col gap-1">
               <div className="bg-slate-900 rounded-lg px-3 py-1 font-mono font-bold text-xl border border-white/10">
-                {match.score}
+                {matchScore}
               </div>
               {match.games && match.games.length > 0 && (
                 <div className="text-[10px] text-slate-500 space-y-0.5">
@@ -178,24 +185,24 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, teams, searchQuery = '', h
 
         {/* Team B */}
         <div className="flex-1 text-right">
-          <div className={`font-bold text-lg ${match.winner === match.teamB ? 'text-lime-400' : 'text-white'}`}>
+          <div className={`font-bold text-lg ${matchWinner === match.teamB ? 'text-lime-400' : 'text-white'}`}>
             {teamBData?.name || match.teamB}
           </div>
           <div className="text-xs text-slate-400 flex flex-col items-end mt-1 gap-0.5">
             <div>
-              {match.isFlexB && match.pB1 !== originalPB1 && (
+              {teamBUsedFlex && match.pB1 !== originalPB1 && (
                 <span className="line-through text-slate-600 mr-1">{renderPlayerName(originalPB1)}</span>
               )}
-              <span className={match.isFlexB && match.pB1 !== originalPB1 ? 'text-pink-400' : ''}>{renderPlayerName(match.pB1)}</span>
+              <span className={teamBUsedFlex && match.pB1 !== originalPB1 ? 'text-pink-400' : ''}>{renderPlayerName(match.pB1)}</span>
             </div>
             <div>
-              {match.isFlexB && match.pB2 !== originalPB2 && (
+              {teamBUsedFlex && match.pB2 !== originalPB2 && (
                 <span className="line-through text-slate-600 mr-1">{renderPlayerName(originalPB2)}</span>
               )}
-              <span className={match.isFlexB && match.pB2 !== originalPB2 ? 'text-pink-400' : ''}>{renderPlayerName(match.pB2)}</span>
+              <span className={teamBUsedFlex && match.pB2 !== originalPB2 ? 'text-pink-400' : ''}>{renderPlayerName(match.pB2)}</span>
             </div>
           </div>
-          {match.isFlexB && <span className="text-[10px] text-pink-400 border border-pink-500/30 px-1 rounded mt-1 inline-block">Flex Used</span>}
+          {teamBUsedFlex && <span className="text-[10px] text-pink-400 border border-pink-500/30 px-1 rounded mt-1 inline-block">Flex Used</span>}
         </div>
       </div>
 

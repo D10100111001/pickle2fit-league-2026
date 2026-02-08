@@ -5,6 +5,7 @@ import { User } from 'firebase/auth';
 import { usePlayers } from '../providers';
 import { Badge } from '../common';
 import { Match, Team, ReportModalProps } from '../../types';
+import { isTeamAFlex, isTeamBFlex, getMatchWinner, getMatchScore } from '../../utils/matchUtils';
 
 const ReportModal: React.FC<ReportModalProps> = ({ match, onClose, onSave, teams, user, playerName }) => {
   const { getPlayerName } = usePlayers();
@@ -29,11 +30,10 @@ const ReportModal: React.FC<ReportModalProps> = ({ match, onClose, onSave, teams
   const [pB2, setPB2] = useState(match.pB2);
 
   // Track which players have been changed from ORIGINAL schedule
-  // Fallback to current if original not set (backward compatibility)
-  const originalPA1 = match.originalPA1 || match.pA1;
-  const originalPA2 = match.originalPA2 || match.pA2;
-  const originalPB1 = match.originalPB1 || match.pB1;
-  const originalPB2 = match.originalPB2 || match.pB2;
+  const originalPA1 = match.originalPA1;
+  const originalPA2 = match.originalPA2;
+  const originalPB1 = match.originalPB1;
+  const originalPB2 = match.originalPB2;
 
   const changedPlayers = [];
   if (pA1 !== originalPA1) changedPlayers.push('pA1');
@@ -51,6 +51,10 @@ const ReportModal: React.FC<ReportModalProps> = ({ match, onClose, onSave, teams
   const checkFlexA = teamAChanged;
   const checkFlexB = teamBChanged;
 
+  // Compute current flex status from stored match data (for history comparison)
+  const currentFlexA = isTeamAFlex(match);
+  const currentFlexB = isTeamBFlex(match);
+
   // Get user display name from player identification
   const getUserDisplayName = () => {
     if (playerName) return playerName;
@@ -60,10 +64,8 @@ const ReportModal: React.FC<ReportModalProps> = ({ match, onClose, onSave, teams
   };
 
   const handleSave = () => {
-    const updateData = {
+    const updateData: Partial<Match> = {
       pA1, pA2, pB1, pB2,
-      isFlexA: checkFlexA,
-      isFlexB: checkFlexB,
       scheduledDate: scheduledDate || null
     };
 
@@ -75,7 +77,7 @@ const ReportModal: React.FC<ReportModalProps> = ({ match, onClose, onSave, teams
       timestamp: new Date().toISOString(),
       userName: displayName,
       userId: userId,
-      changes: {}
+      changes: {} as any
     };
 
     // Track what changed
@@ -83,48 +85,33 @@ const ReportModal: React.FC<ReportModalProps> = ({ match, onClose, onSave, teams
       historyEntry.changes.scheduledDate = { from: match.scheduledDate, to: scheduledDate || null };
     }
     if (match.pA1 !== pA1 || match.pA2 !== pA2) {
-      const flexNote = checkFlexA ? ' (Flex Used)' : (match.isFlexA && !checkFlexA ? ' (Flex Removed)' : '');
+      const flexNote = checkFlexA ? ' (Flex Used)' : (currentFlexA && !checkFlexA ? ' (Flex Removed)' : '');
       historyEntry.changes.teamAPlayers = { from: `${match.pA1}, ${match.pA2}`, to: `${pA1}, ${pA2}${flexNote}` };
     }
     if (match.pB1 !== pB1 || match.pB2 !== pB2) {
-      const flexNote = checkFlexB ? ' (Flex Used)' : (match.isFlexB && !checkFlexB ? ' (Flex Removed)' : '');
+      const flexNote = checkFlexB ? ' (Flex Used)' : (currentFlexB && !checkFlexB ? ' (Flex Removed)' : '');
       historyEntry.changes.teamBPlayers = { from: `${match.pB1}, ${match.pB2}`, to: `${pB1}, ${pB2}${flexNote}` };
     }
 
-    // Calculate match winner based on games (best of 3)
+    // Save games if they have valid data
     const validGames = games.filter(g => g.scoreA && g.scoreB);
 
     if (validGames.length > 0) {
-      // Calculate who won each game
-      let teamAWins = 0;
-      let teamBWins = 0;
-
-      validGames.forEach(game => {
-        const scoreA = parseInt(game.scoreA);
-        const scoreB = parseInt(game.scoreB);
-        if (scoreA > scoreB) {
-          teamAWins++;
-        } else if (scoreB > scoreA) {
-          teamBWins++;
-        }
-      });
-
-      // Determine match winner (best of 3)
-      const matchWinner = teamAWins > teamBWins ? match.teamA : match.teamB;
-      const matchScore = `${teamAWins}-${teamBWins}`;
-
       updateData.games = games;
-      updateData.score = matchScore;
-      updateData.winner = matchWinner;
       updateData.reportedDate = new Date().toISOString();
       updateData.reportedBy = displayName;
       updateData.reportedById = userId;
 
+      // Compute winner and score for history (not stored)
+      const tempMatch = { ...match, games };
+      const matchScore = getMatchScore(tempMatch);
+      const matchWinner = getMatchWinner(tempMatch);
+
       // Format games for history
       const gamesStr = validGames.map((g, i) => `Game ${i + 1}: ${g.scoreA}-${g.scoreB}`).join(', ');
       historyEntry.changes.games = { from: match.games ? 'Previous games' : 'Not set', to: gamesStr };
-      historyEntry.changes.score = { from: match.score || 'Not set', to: matchScore };
-      historyEntry.changes.winner = { from: match.winner || 'Not set', to: matchWinner };
+      historyEntry.changes.score = { from: getMatchScore(match) || 'Not set', to: matchScore };
+      historyEntry.changes.winner = { from: getMatchWinner(match) || 'Not set', to: matchWinner || 'Not set' };
     }
 
     // Add history entry if there are changes
@@ -137,15 +124,14 @@ const ReportModal: React.FC<ReportModalProps> = ({ match, onClose, onSave, teams
   };
 
   const handleClear = () => {
-    if (!match.score) return; // Nothing to clear
+    const currentScore = getMatchScore(match);
+    if (!currentScore) return; // Nothing to clear
 
     const displayName = getUserDisplayName();
     const userId = user?.uid || 'unknown';
 
-    const updateData = {
-      score: '',
-      winner: null,
-      games: null,
+    const updateData: Partial<Match> = {
+      games: undefined,
       reportedDate: null,
       reportedBy: null,
       reportedById: null
@@ -157,8 +143,8 @@ const ReportModal: React.FC<ReportModalProps> = ({ match, onClose, onSave, teams
       userName: displayName,
       userId: userId,
       changes: {
-        score: { from: match.score, to: 'Cleared' },
-        winner: { from: match.winner || 'Not set', to: 'Cleared' },
+        score: { from: currentScore, to: 'Cleared' },
+        winner: { from: getMatchWinner(match) || 'Not set', to: 'Cleared' },
         games: { from: 'Previous games', to: 'Cleared' }
       }
     };
@@ -591,7 +577,7 @@ const ReportModal: React.FC<ReportModalProps> = ({ match, onClose, onSave, teams
           >
             <X size={20} />
           </button>
-          {match.score && (
+          {getMatchScore(match) && (
             <button
               onClick={handleClear}
               className="px-4 py-3.5 rounded-xl text-sm font-semibold text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 transition-all active:scale-95 flex items-center justify-center"

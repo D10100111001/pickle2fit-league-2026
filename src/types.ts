@@ -56,15 +56,13 @@ export interface MatchSchedule {
 }
 
 export interface Match extends MatchSchedule {
-  // Original schedule - computed at seed/load time, never modified
-  originalPA1?: PlayerId;
-  originalPA2?: PlayerId;
-  originalPB1?: PlayerId;
-  originalPB2?: PlayerId;
-  winner?: string | null;
-  score?: string;
-  isFlexA?: boolean;
-  isFlexB?: boolean;
+  // Original schedule - set at seed time, never modified
+  originalPA1: PlayerId;
+  originalPA2: PlayerId;
+  originalPB1: PlayerId;
+  originalPB2: PlayerId;
+  // Note: winner, score, isFlexA, isFlexB are computed from games and player assignments
+  // They should NOT be stored - use utility functions in utils/matchUtils.ts
   scheduledDate: string | null;
   reportedDate: string | null;
   reportedBy: string | null;
