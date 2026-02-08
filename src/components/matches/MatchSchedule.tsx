@@ -5,6 +5,7 @@ import { usePlayers } from '../providers';
 import { MultiSelectPlayerAutocomplete } from '../common';
 import MatchCard from './MatchCard';
 import { Match, Team, PlayerId, Player, ReportModalProps } from '../../types';
+import { getMatchWinner, isTeamAFlex, isTeamBFlex } from '../../utils/matchUtils';
 
 interface MatchScheduleProps {
   matches: Match[];
@@ -46,10 +47,13 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
   // Filter and sort matches by team and/or player
   const filteredMatches = matches
     .filter(m => {
-      if (completionFilter === 'completed' && !m.winner) return false;
-      if (completionFilter === 'upcoming' && m.winner) return false;
+      // Use computed winner function instead of stored property
+      const winner = getMatchWinner(m);
+      if (completionFilter === 'completed' && !winner) return false;
+      if (completionFilter === 'upcoming' && winner) return false;
       if (completionFilter === 'flexed') {
-        const isFlexed = m.isFlexA || m.isFlexB;
+        // Use computed flex functions instead of stored properties
+        const isFlexed = isTeamAFlex(m) || isTeamBFlex(m);
         if (!isFlexed) return false;
       }
 
@@ -79,8 +83,9 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
         }
         return a.id - b.id;
       } else if (sortBy === 'status') {
-        const aCompleted = !!a.winner;
-        const bCompleted = !!b.winner;
+        // Use computed winner function instead of stored property
+        const aCompleted = !!getMatchWinner(a);
+        const bCompleted = !!getMatchWinner(b);
         if (aCompleted !== bCompleted) {
           return aCompleted ? 1 : -1;
         }
@@ -90,7 +95,7 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
       }
     });
 
-  const handlePlayerSelect = (playerId: PlayerId, player: Player) => {
+  const handlePlayerSelect = (playerId: PlayerId, _player: Player) => {
     if (!selectedPlayers.includes(playerId)) {
       setSelectedPlayers(prev => [...prev, playerId]);
     }

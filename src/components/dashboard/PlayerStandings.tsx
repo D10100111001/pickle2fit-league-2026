@@ -41,6 +41,11 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({
   const [sortField, setSortField] = useState<SortField>('winRate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
+  // Helper function to find a player's team
+  const getPlayerTeam = (playerId: string): Team | undefined => {
+    return teams.find(team => team.players.includes(playerId));
+  };
+
   // Calculate player statistics
   const calculatePlayerStats = (): PlayerStats[] => {
     const stats: { [key: string]: Omit<PlayerStats, 'winRate' | 'name' | 'avgPointDifferential'> } = {};
@@ -233,7 +238,19 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({
                     <Award className="w-3 h-3 inline mr-1" />
                     MVP Leader
                   </Badge>
-                  <h3 className="text-2xl font-black text-white mb-1">{mvpPlayer.name}</h3>
+                  <div className="flex items-center gap-2 mb-1">
+                    {(() => {
+                      const mvpTeam = getPlayerTeam(mvpPlayer.playerId);
+                      return mvpTeam ? (
+                        <img
+                          src={mvpTeam.logo}
+                          alt={mvpTeam.name}
+                          className="w-7 h-7 object-contain"
+                        />
+                      ) : null;
+                    })()}
+                    <h3 className="text-2xl font-black text-white">{mvpPlayer.name}</h3>
+                  </div>
                   <p className="text-sm text-yellow-200/80 font-medium">
                     {mvpPlayer.wins} Wins • {mvpPlayer.winRate.toFixed(0)}% Win Rate • {mvpPlayer.pointDifferential > 0 ? '+' : ''}{mvpPlayer.pointDifferential} Point Diff
                   </p>
@@ -386,9 +403,21 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`font-semibold ${isMVP ? 'text-yellow-400' : 'text-white'}`}>
-                        {player.name}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {(() => {
+                          const playerTeam = getPlayerTeam(player.playerId);
+                          return playerTeam ? (
+                            <img
+                              src={playerTeam.logo}
+                              alt={playerTeam.name}
+                              className="w-6 h-6 object-contain"
+                            />
+                          ) : null;
+                        })()}
+                        <span className={`font-semibold ${isMVP ? 'text-yellow-400' : 'text-white'}`}>
+                          {player.name}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`font-bold ${player.played > 0 ? 'text-lime-400' : 'text-slate-600'}`}>
