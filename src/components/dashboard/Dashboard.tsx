@@ -2,6 +2,7 @@ import { Calendar, Activity, Crown, ChevronRight } from 'lucide-react';
 import { usePlayers } from '../providers';
 import { Badge, Card } from '../common';
 import { Match, Team } from '../../types';
+import TeamStats from './TeamStats';
 import PlayerStandings from './PlayerStandings';
 
 interface DashboardProps {
@@ -173,6 +174,9 @@ const Dashboard: React.FC<DashboardProps> = ({ standings, matches, teams, onMatc
           </table>
         </div>
       </Card>
+
+      {/* Team Stats — Spotlights + Analytics */}
+      <TeamStats matches={matches} teams={teams} />
 
       {/* Player Standings */}
       <PlayerStandings
