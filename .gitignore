@@ -18,6 +18,9 @@ dist-ssr
 .env.production.local
 .env.development.local
 
+# Backups
+backups/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -28,3 +31,4 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+.firebase-sa-key.json

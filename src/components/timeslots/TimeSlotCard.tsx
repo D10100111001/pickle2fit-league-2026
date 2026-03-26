@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState } from 'react';
-import { Calendar, ChevronUp, ChevronDown, Edit3, Trash2 } from 'lucide-react';
+import { Calendar, Edit3, Trash2 } from 'lucide-react';
 import { useTimeSlots } from '../providers';
 import { Card, Badge } from '../common';
 import { RSVPModal } from '../modals';
@@ -16,7 +16,6 @@ export const TimeSlotCard = ({ timeSlot, matches, getPlayerName, updateTimeSlot,
   const [showRSVPModal, setShowRSVPModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [expanded, setExpanded] = useState(false);
 
   const rsvps = getRSVPsForTimeSlot(timeSlot.id);
   const comingRsvps = rsvps.filter(r => r.status === 'coming');
@@ -131,8 +130,6 @@ export const TimeSlotCard = ({ timeSlot, matches, getPlayerName, updateTimeSlot,
           {missingPlayers.length > 0 && (
             <MissingPlayersSection
               missingPlayers={missingPlayers}
-              expanded={expanded}
-              setExpanded={setExpanded}
             />
           )}
 
@@ -143,13 +140,6 @@ export const TimeSlotCard = ({ timeSlot, matches, getPlayerName, updateTimeSlot,
               className="flex-1 px-4 py-2 bg-gradient-to-r from-lime-400 to-green-500 hover:from-lime-500 hover:to-green-600 text-slate-900 font-bold rounded-xl shadow-lg transition-all duration-200"
             >
               RSVP
-            </button>
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="px-4 py-2 bg-slate-700/50 hover:bg-slate-700 text-white font-medium rounded-xl transition-colors flex items-center gap-2"
-            >
-              {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-              Details
             </button>
             {canEdit && (
               <>

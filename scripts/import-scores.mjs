@@ -5,12 +5,7 @@
  * Usage: node scripts/import-scores.mjs
  */
 
-import admin from "firebase-admin";
-
-// Initialize with project ID (uses ADC or gcloud credentials)
-admin.initializeApp({ projectId: "pickle2fit-league-2026" });
-const db = admin.firestore();
-const appId = "pickle2fit-league-2026";
+import { db, appId } from "./firebase-admin-init.mjs";
 
 // Player name -> ID mapping
 const PLAYER_NAMES_TO_ID = {

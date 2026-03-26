@@ -1,7 +1,7 @@
 import React from 'react';
 import { Info } from 'lucide-react';
 
-export const MissingPlayersSection = ({ missingPlayers, expanded }) => {
+export const MissingPlayersSection = ({ missingPlayers }) => {
   if (missingPlayers.length === 0) return null;
 
   const getPriorityStars = (count) => {
@@ -51,11 +51,9 @@ export const MissingPlayersSection = ({ missingPlayers, expanded }) => {
                 </div>
               </div>
             </div>
-            {expanded && (
-              <div className="mt-2 text-xs text-slate-500">
-                Matches: {player.matches.join(', ')}
-              </div>
-            )}
+            <div className="mt-2 text-xs text-slate-500">
+              Matches: {player.matches.join(', ')}
+            </div>
           </div>
         ))}
       </div>
