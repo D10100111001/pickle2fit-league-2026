@@ -1,10 +1,9 @@
 import React from 'react';
 import { useState } from 'react';
 import { X, Edit3, Users, Calendar, ChevronUp, ChevronDown, Trophy, Activity, ChevronRight, Save, Trash2, RotateCcw } from 'lucide-react';
-import { User } from 'firebase/auth';
 import { usePlayers } from '../providers';
 import { Badge } from '../common';
-import { Match, Team, ReportModalProps } from '../../types';
+import { Match, ReportModalProps } from '../../types';
 import { isTeamAFlex, isTeamBFlex, getMatchWinner, getMatchScore } from '../../utils/matchUtils';
 
 const ReportModal: React.FC<ReportModalProps> = ({ match, onClose, onSave, teams, user, playerName }) => {
@@ -15,7 +14,6 @@ const ReportModal: React.FC<ReportModalProps> = ({ match, onClose, onSave, teams
     { scoreA: '', scoreB: '' },
     { scoreA: '', scoreB: '' }
   ]);
-  const [winner, setWinner] = useState(match.winner || match.teamA);
   const [scheduledDate, setScheduledDate] = useState(match.scheduledDate || '');
   const [showHistory, setShowHistory] = useState(false);
   const [showPlayers, setShowPlayers] = useState(true);

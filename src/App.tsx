@@ -27,6 +27,7 @@ import {
   collection,
   onSnapshot,
   writeBatch,
+  getDocs,
 } from "firebase/firestore";
 import { PlayersProvider, TimeSlotsProvider } from "./components/providers";
 import { NavBtn, MobileNavBtn } from "./components/common";
@@ -66,6 +67,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = import.meta.env.VITE_APP_ID || "pickle2fit-league-2026";
+const ADMIN_EMAIL = "tehtech1337@gmail.com";
 
 interface TeamStats {
   id: string;
@@ -211,15 +213,44 @@ export default function App() {
       "matches"
     );
 
+    const SEEDED_KEY = `pickle2fit_seeded_${appId}`;
+
     const unsubscribe = onSnapshot(
       matchesRef,
       async (snapshot) => {
         setLoading(true);
 
-        // Auto-Seed Database if empty
+        // Auto-Seed is disabled — only admin can trigger it manually
         if (snapshot.empty && !initialized.current) {
           initialized.current = true;
-          // Batch write the initial seed data with original player fields
+          const isAdmin = user.email === ADMIN_EMAIL;
+
+          if (!isAdmin) {
+            console.warn("Matches collection is empty. Only admin can seed data.");
+            setLoading(false);
+            return;
+          }
+
+          // Admin guard: if previously seeded, don't auto-reseed — require explicit action
+          if (localStorage.getItem(SEEDED_KEY)) {
+            console.warn(
+              "Matches collection is empty but was previously seeded. " +
+              "Skipping auto-seed to prevent data loss. " +
+              "Remove localStorage key to re-seed: " + SEEDED_KEY
+            );
+            setLoading(false);
+            return;
+          }
+
+          // Double-check with a direct query to avoid acting on a stale/glitchy snapshot
+          const freshSnapshot = await getDocs(matchesRef);
+          if (!freshSnapshot.empty) {
+            console.warn("Snapshot was empty but direct query found data. Skipping seed.");
+            setLoading(false);
+            return;
+          }
+
+          // Seed the database
           const batch = writeBatch(db);
           SEEDED_MATCHES.forEach((match) => {
             const ref = doc(
@@ -231,7 +262,6 @@ export default function App() {
               "matches",
               match.id.toString()
             );
-            // Set original fields from current players at seed time
             const matchWithOriginals: Match = {
               ...match,
               originalPA1: match.pA1,
@@ -247,6 +277,7 @@ export default function App() {
             batch.set(ref, matchWithOriginals);
           });
           await batch.commit();
+          localStorage.setItem(SEEDED_KEY, new Date().toISOString());
           setLoading(false);
           return;
         }
@@ -283,6 +314,11 @@ export default function App() {
         }
         // Sort in memory (Rule 2: Avoid complex queries)
         loadedMatches.sort((a, b) => a.id - b.id);
+
+        // Mark as seeded for existing users so the guard protects them too
+        if (!localStorage.getItem(SEEDED_KEY)) {
+          localStorage.setItem(SEEDED_KEY, new Date().toISOString());
+        }
 
         setMatches(loadedMatches);
         setLoading(false);
