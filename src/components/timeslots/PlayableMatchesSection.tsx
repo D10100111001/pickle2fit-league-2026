@@ -1,15 +1,21 @@
-import React from 'react';
 import { useState, useMemo } from 'react';
 import { Sparkles } from 'lucide-react';
 import { usePlayers, useTimeSlots } from '../providers';
 import { INITIAL_TEAMS } from './timeslotHelpers';
+import { Match, TimeSlot } from '../../types';
 
-export const PlayableMatchesSection = ({ playableMatches, timeSlot, totalRsvps }) => {
+interface PlayableMatchesSectionProps {
+  playableMatches: Match[];
+  timeSlot: TimeSlot;
+  totalRsvps: number;
+}
+
+export const PlayableMatchesSection = ({ playableMatches, timeSlot, totalRsvps }: PlayableMatchesSectionProps) => {
   const { linkMatchToTimeSlot } = useTimeSlots();
   const { getPlayerName } = usePlayers();
-  const [linking, setLinking] = useState({});
+  const [linking, setLinking] = useState<Record<number, boolean>>({});
 
-  const handleLinkMatch = async (matchId, shouldLink) => {
+  const handleLinkMatch = async (matchId: number, shouldLink: boolean) => {
     setLinking({ ...linking, [matchId]: true });
     try {
       await linkMatchToTimeSlot(timeSlot.id, matchId, shouldLink);

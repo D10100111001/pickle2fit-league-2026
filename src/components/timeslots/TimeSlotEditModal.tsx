@@ -1,9 +1,15 @@
-import React from 'react';
-import { useState } from 'react';
+import { useState, FormEvent } from 'react';
 import { Edit3, X, Loader2 } from 'lucide-react';
+import { TimeSlot } from '../../types';
 
-export const TimeSlotEditModal = ({ timeSlot, onClose, onSubmit }) => {
-  const formatDateTimeLocal = (isoString) => {
+interface TimeSlotEditModalProps {
+  timeSlot: TimeSlot;
+  onClose: () => void;
+  onSubmit: (slotId: string, dateTime: string, location: string, notes: string) => Promise<void>;
+}
+
+export const TimeSlotEditModal = ({ timeSlot, onClose, onSubmit }: TimeSlotEditModalProps) => {
+  const formatDateTimeLocal = (isoString: string) => {
     const date = new Date(isoString);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -19,7 +25,7 @@ export const TimeSlotEditModal = ({ timeSlot, onClose, onSubmit }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
     if (!dateTime) {

@@ -1,10 +1,22 @@
-import React from 'react';
 import { Info } from 'lucide-react';
+import { Team } from '../../types';
 
-export const MissingPlayersSection = ({ missingPlayers }) => {
+interface MissingPlayer {
+  playerId: string;
+  playerName: string;
+  team: Team | null;
+  matchCount: number;
+  matches: number[];
+}
+
+interface MissingPlayersSectionProps {
+  missingPlayers: MissingPlayer[];
+}
+
+export const MissingPlayersSection = ({ missingPlayers }: MissingPlayersSectionProps) => {
   if (missingPlayers.length === 0) return null;
 
-  const getPriorityStars = (count) => {
+  const getPriorityStars = (count: number) => {
     if (count >= 5) return '⭐⭐⭐';
     if (count >= 3) return '⭐⭐';
     return '⭐';

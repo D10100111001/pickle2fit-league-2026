@@ -1,9 +1,20 @@
-import React from 'react';
 import { useMemo } from 'react';
 import { Users } from 'lucide-react';
 import { INITIAL_TEAMS } from './timeslotHelpers';
+import { RSVP, PlayerId, Team } from '../../types';
 
-export const RSVPSummary = ({ rsvps, comingRsvps, getPlayerName }) => {
+interface TeamGroup {
+  team: Team;
+  players: RSVP[];
+}
+
+interface RSVPSummaryProps {
+  rsvps: RSVP[];
+  comingRsvps: RSVP[];
+  getPlayerName: (playerId: PlayerId) => string;
+}
+
+export const RSVPSummary = ({ rsvps, comingRsvps, getPlayerName }: RSVPSummaryProps) => {
   if (rsvps.length === 0) {
     return (
       <div className="bg-slate-900/50 rounded-xl p-4 border border-white/5 text-center">
@@ -14,7 +25,7 @@ export const RSVPSummary = ({ rsvps, comingRsvps, getPlayerName }) => {
 
   // Group coming players by team
   const playersByTeam = useMemo(() => {
-    const grouped = {};
+    const grouped: Record<string, TeamGroup> = {};
 
     comingRsvps.forEach(rsvp => {
       const team = INITIAL_TEAMS.find(t => t.players.includes(rsvp.playerId));

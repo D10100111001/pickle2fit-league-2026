@@ -1,15 +1,19 @@
-import React from 'react';
-import { useState } from 'react';
+import { useState, FormEvent } from 'react';
 import { CalendarClock, X, Loader2 } from 'lucide-react';
 
-export const TimeSlotProposalModal = ({ onClose, onSubmit }) => {
+interface TimeSlotProposalModalProps {
+  onClose: () => void;
+  onSubmit: (dateTime: string, location: string, notes: string) => Promise<void>;
+}
+
+export const TimeSlotProposalModal = ({ onClose, onSubmit }: TimeSlotProposalModalProps) => {
   const [dateTime, setDateTime] = useState('');
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
     if (!dateTime) {

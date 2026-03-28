@@ -1,8 +1,14 @@
-import React from 'react';
 import { useState } from 'react';
 import { Trash2, X, Loader2 } from 'lucide-react';
+import { TimeSlot } from '../../types';
 
-export const DeleteConfirmModal = ({ onClose, onConfirm, timeSlot }) => {
+interface DeleteConfirmModalProps {
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+  timeSlot: TimeSlot;
+}
+
+export const DeleteConfirmModal = ({ onClose, onConfirm, timeSlot }: DeleteConfirmModalProps) => {
   const [deleting, setDeleting] = useState(false);
 
   const handleConfirm = async () => {
@@ -15,9 +21,9 @@ export const DeleteConfirmModal = ({ onClose, onConfirm, timeSlot }) => {
     }
   };
 
-  const formatDateTime = (isoString) => {
+  const formatDateTime = (isoString: string) => {
     const date = new Date(isoString);
-    const options = {
+    const options: Intl.DateTimeFormatOptions = {
       weekday: 'long',
       month: 'short',
       day: 'numeric',

@@ -1,4 +1,3 @@
-import React from 'react';
 import { useState } from 'react';
 import { Calendar, Edit3, Trash2 } from 'lucide-react';
 import { useTimeSlots } from '../providers';
@@ -10,8 +9,17 @@ import { RSVPSummary } from './RSVPSummary';
 import { PlayableMatchesSection } from './PlayableMatchesSection';
 import { MissingPlayersSection } from './MissingPlayersSection';
 import { calculatePlayableMatches, calculateMissingPlayerImpact } from './timeslotHelpers';
+import { Match, TimeSlot, PlayerId } from '../../types';
 
-export const TimeSlotCard = ({ timeSlot, matches, getPlayerName, updateTimeSlot, deleteTimeSlot }) => {
+interface TimeSlotCardProps {
+  timeSlot: TimeSlot;
+  matches: Match[];
+  getPlayerName: (playerId: PlayerId, fallbackToId?: boolean) => string;
+  updateTimeSlot: (slotId: string, dateTime: string, location: string, notes: string) => Promise<void>;
+  deleteTimeSlot: (slotId: string) => Promise<void>;
+}
+
+export const TimeSlotCard = ({ timeSlot, matches, getPlayerName, updateTimeSlot, deleteTimeSlot }: TimeSlotCardProps) => {
   const { getRSVPsForTimeSlot, user } = useTimeSlots();
   const [showRSVPModal, setShowRSVPModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -28,9 +36,9 @@ export const TimeSlotCard = ({ timeSlot, matches, getPlayerName, updateTimeSlot,
   const missingPlayers = calculateMissingPlayerImpact(matches, attendingPlayerIds, getPlayerName);
 
   // Format date/time
-  const formatDateTime = (isoString) => {
+  const formatDateTime = (isoString: string) => {
     const date = new Date(isoString);
-    const options = {
+    const options: Intl.DateTimeFormatOptions = {
       weekday: 'long',
       month: 'short',
       day: 'numeric',

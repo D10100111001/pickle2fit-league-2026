@@ -1,11 +1,21 @@
 import { INITIAL_TEAMS } from "../../constants";
+import { getMatchWinner } from "../../utils/matchUtils";
+import { Match, PlayerId, Team } from "../../types";
+
+interface PlayerImpact {
+  playerId: PlayerId;
+  playerName: string;
+  team: Team | null;
+  matchCount: number;
+  matches: number[];
+}
 
 // Helper function to calculate playable matches
-export const calculatePlayableMatches = (matches, attendingPlayerIds) => {
+export const calculatePlayableMatches = (matches: Match[], attendingPlayerIds: PlayerId[]): Match[] => {
   const attendingSet = new Set(attendingPlayerIds);
 
   return matches
-    .filter(m => !m.winner) // Unplayed matches only
+    .filter(m => !getMatchWinner(m)) // Unplayed matches only
     .filter(m =>
       attendingSet.has(m.pA1) &&
       attendingSet.has(m.pA2) &&
@@ -16,11 +26,15 @@ export const calculatePlayableMatches = (matches, attendingPlayerIds) => {
 };
 
 // Helper function to calculate missing player impact
-export const calculateMissingPlayerImpact = (matches, attendingPlayerIds, getPlayerName) => {
+export const calculateMissingPlayerImpact = (
+  matches: Match[],
+  attendingPlayerIds: PlayerId[],
+  getPlayerName: (playerId: PlayerId, fallbackToId?: boolean) => string
+): PlayerImpact[] => {
   const attendingSet = new Set(attendingPlayerIds);
-  const unplayedMatches = matches.filter(m => !m.winner);
+  const unplayedMatches = matches.filter(m => !getMatchWinner(m));
 
-  const playerImpact = {};
+  const playerImpact: Record<string, PlayerImpact> = {};
 
   unplayedMatches.forEach(match => {
     const requiredPlayers = [match.pA1, match.pA2, match.pB1, match.pB2];

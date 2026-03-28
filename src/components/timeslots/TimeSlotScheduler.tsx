@@ -1,12 +1,16 @@
-import React from 'react';
 import { useState } from 'react';
 import { CalendarClock, Filter } from 'lucide-react';
 import { usePlayers, useTimeSlots } from '../providers';
 import { Card } from '../common';
 import { TimeSlotCard } from './TimeSlotCard';
 import { TimeSlotProposalModal } from './TimeSlotProposalModal';
+import { Match } from '../../types';
 
-export const TimeSlotScheduler = ({ matches }) => {
+interface TimeSlotSchedulerProps {
+  matches: Match[];
+}
+
+export const TimeSlotScheduler = ({ matches }: TimeSlotSchedulerProps) => {
   const { timeSlots, proposeTimeSlot, updateTimeSlot, deleteTimeSlot } = useTimeSlots();
   const { getPlayerName } = usePlayers();
   const [showProposalModal, setShowProposalModal] = useState(false);
