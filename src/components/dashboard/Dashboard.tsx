@@ -1,9 +1,12 @@
-import { Calendar, Activity, Crown, ChevronRight } from 'lucide-react';
+import { useState } from 'react';
+import { Calendar, Activity, Crown, ChevronRight, Trophy, TrendingUp, CheckCircle2, Circle } from 'lucide-react';
 import { usePlayers } from '../providers';
 import { Badge, Card } from '../common';
 import { Match, Team } from '../../types';
 import TeamStats from './TeamStats';
 import PlayerStandings from './PlayerStandings';
+import { getLatestMatchDay, getMatchesForDay, calculateStandingsForMatches, formatMatchDay } from '../../utils/matchDayUtils';
+import { getMatchWinner } from '../../utils/matchUtils';
 
 interface DashboardProps {
   standings: Array<{
@@ -22,9 +25,65 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ standings, matches, teams, onMatchClick, onViewAllMatches }) => {
   const { getPlayerName } = usePlayers();
+  const [viewMode, setViewMode] = useState<'overall' | 'latest'>('overall');
+
+  // Get latest match day data
+  const latestDay = getLatestMatchDay(matches);
+  const latestDayMatches = latestDay ? getMatchesForDay(matches, latestDay) : [];
+
+  // Helper for local date strings
+  const getLocalDateString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // DEBUG: Log match data analysis
+  if (matches.length > 0) {
+    const completedMatches = matches.filter(m => getMatchWinner(m) !== null);
+    const byReportedDate: Record<string, number> = {};
+
+    completedMatches.forEach(m => {
+      if (m.reportedDate) {
+        const date = new Date(m.reportedDate);
+        const day = getLocalDateString(date);
+        byReportedDate[day] = (byReportedDate[day] || 0) + 1;
+      }
+    });
+
+    console.log('=== MATCH DATA ANALYSIS (CST) ===');
+    console.log('Total matches:', matches.length);
+    console.log('Completed matches:', completedMatches.length);
+    console.log('\nBy reportedDate (local timezone):');
+    Object.keys(byReportedDate).sort().reverse().forEach(date => {
+      console.log(`  ${date}: ${byReportedDate[date]} matches`);
+    });
+    console.log('\nLatest session detected:', latestDay || 'none');
+    console.log('Latest session matches count:', latestDayMatches.length);
+
+    // Show which days are included in the session
+    if (latestDayMatches.length > 0) {
+      const sessionDays = new Set<string>();
+      latestDayMatches.forEach(m => {
+        if (m.reportedDate) {
+          const date = new Date(m.reportedDate);
+          sessionDays.add(getLocalDateString(date));
+        }
+      });
+      console.log('Session includes days:', Array.from(sessionDays).sort().reverse().join(', '));
+    }
+    console.log('=========================\n');
+  }
+
+  // Filter data based on view mode
+  const displayMatches = viewMode === 'latest' ? latestDayMatches : matches;
+  const displayStandings = viewMode === 'latest'
+    ? calculateStandingsForMatches(latestDayMatches, teams)
+    : standings;
 
   // Sort upcoming matches by date (matches with dates first, then by date, then by ID)
-  const upcomingMatches = matches
+  const upcomingMatches = displayMatches
     .filter(m => !m.winner)
     .sort((a, b) => {
       if (a.scheduledDate && !b.scheduledDate) return -1;
@@ -37,7 +96,7 @@ const Dashboard: React.FC<DashboardProps> = ({ standings, matches, teams, onMatc
     .slice(0, 3);
 
   // Sort recent matches by reported date (most recent first), fallback to ID
-  const recentMatches = matches
+  const recentMatches = displayMatches
     .filter(m => m.winner && m.score) // Only show matches with valid results
     .sort((a, b) => {
       if (a.reportedDate && b.reportedDate) {
@@ -80,22 +139,105 @@ const Dashboard: React.FC<DashboardProps> = ({ standings, matches, teams, onMatc
   };
 
   // Calculate top team (only if games have been played)
-  const topTeam = standings.length > 0 && standings[0].played > 0 ? standings[0] : null;
+  const topTeam = displayStandings.length > 0 && displayStandings[0].played > 0 ? displayStandings[0] : null;
+
+  // Calculate match progress for full season
+  const completedMatches = matches.filter(m => getMatchWinner(m) !== null);
+  const totalMatches = matches.length;
+  const remainingMatches = totalMatches - completedMatches.length;
 
   return (
     <div className="space-y-6">
+      {/* Dashboard Toggle with Match Progress */}
+      <div className="flex justify-between items-center">
+        {/* Match Progress - Compact */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-lime-500/10 rounded-lg border border-lime-500/20">
+            <CheckCircle2 className="w-3.5 h-3.5 text-lime-400" />
+            <div className="flex items-baseline gap-1">
+              <span className="text-base font-bold text-lime-400">{completedMatches.length}</span>
+              <span className="text-[10px] text-slate-500 uppercase">Done</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700">
+            <Circle className="w-3.5 h-3.5 text-slate-400" />
+            <div className="flex items-baseline gap-1">
+              <span className="text-base font-bold text-slate-300">{remainingMatches}</span>
+              <span className="text-[10px] text-slate-500 uppercase">Left</span>
+            </div>
+          </div>
+        </div>
+
+        {/* View Toggle */}
+        {latestDay && (
+          <div className="inline-flex bg-slate-800 rounded-lg p-0.5">
+            <button
+              onClick={() => setViewMode('overall')}
+              className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
+                viewMode === 'overall'
+                  ? 'bg-lime-500 text-slate-900'
+                  : 'text-slate-400 hover:text-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-1.5">
+                <Trophy className="w-3 h-3" />
+                Overall
+              </div>
+            </button>
+            <button
+              onClick={() => setViewMode('latest')}
+              className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
+                viewMode === 'latest'
+                  ? 'bg-lime-500 text-slate-900'
+                  : 'text-slate-400 hover:text-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-1.5">
+                <TrendingUp className="w-3 h-3" />
+                {formatMatchDay(latestDay)}
+              </div>
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Hero Section with Team Logos */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 p-6 md:p-10 shadow-2xl">
         <div className="absolute top-0 right-0 p-32 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
         <div className="relative z-10">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
             <div className="text-center md:text-left">
-              <Badge className="bg-white/20 text-white backdrop-blur-sm mb-3 inline-block">{topTeam ? 'Current Leader' : 'League 2026'}</Badge>
+              <Badge className="bg-white/20 text-white backdrop-blur-sm mb-3 inline-block">
+                {viewMode === 'latest'
+                  ? (() => {
+                      // Get date range for the session (using local timezone)
+                      const sessionDays = new Set<string>();
+                      latestDayMatches.forEach(m => {
+                        if (m.reportedDate) {
+                          const date = new Date(m.reportedDate);
+                          sessionDays.add(getLocalDateString(date));
+                        }
+                      });
+                      const sortedDays = Array.from(sessionDays).sort();
+                      if (sortedDays.length === 1) {
+                        const date = new Date(sortedDays[0] + 'T00:00:00');
+                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                      } else if (sortedDays.length > 1) {
+                        const start = new Date(sortedDays[0] + 'T00:00:00');
+                        const end = new Date(sortedDays[sortedDays.length - 1] + 'T00:00:00');
+                        return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+                      }
+                      return 'Last Session';
+                    })()
+                  : (topTeam ? 'Current Leader' : 'League 2026')}
+              </Badge>
               <h2 className="text-3xl md:text-5xl font-black text-white mb-1">
                 {topTeam ? topTeam.name : 'Pickle2Fit League'}
               </h2>
               <p className="text-white/80 font-medium">
-                {topTeam ? `${topTeam.wins} Wins • ${(topTeam.wins / (topTeam.played || 1) * 100).toFixed(0)}% WR` : '4 Teams Battle for Glory'}
+                {viewMode === 'latest'
+                  ? `${latestDayMatches.length} ${latestDayMatches.length === 1 ? 'Match' : 'Matches'} Played`
+                  : (topTeam ? `${topTeam.wins} Wins • ${(topTeam.wins / (topTeam.played || 1) * 100).toFixed(0)}% WR` : '4 Teams Battle for Glory')}
               </p>
             </div>
 
@@ -136,9 +278,14 @@ const Dashboard: React.FC<DashboardProps> = ({ standings, matches, teams, onMatc
       <Card>
         <div className="p-4 border-b border-white/5 flex justify-between items-center">
           <h3 className="font-bold text-lg flex items-center gap-2">
-            <Activity className="w-5 h-5 text-lime-400" /> Standings
+            <Activity className="w-5 h-5 text-lime-400" />
+            {viewMode === 'latest' ? 'Latest Session Standings' : 'Standings'}
           </h3>
-          <span className="text-xs text-slate-400">Top 4 to Playoffs</span>
+          <span className="text-xs text-slate-400">
+            {viewMode === 'latest'
+              ? `${latestDayMatches.length} ${latestDayMatches.length === 1 ? 'match' : 'matches'}`
+              : 'Top 4 to Playoffs'}
+          </span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
@@ -149,11 +296,11 @@ const Dashboard: React.FC<DashboardProps> = ({ standings, matches, teams, onMatc
                 <th className="px-4 py-3 text-center">W%</th>
                 <th className="px-4 py-3 text-center">W</th>
                 <th className="px-4 py-3 text-center">L</th>
-                <th className="px-4 py-3 text-center">Flex</th>
+                {viewMode === 'overall' && <th className="px-4 py-3 text-center">Flex</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {standings.map((team, idx) => {
+              {displayStandings.map((team, idx) => {
                 const winRate = team.played > 0 ? (team.wins / team.played * 100).toFixed(0) : '0';
                 return (
                   <tr key={team.id} className="hover:bg-white/5 transition-colors">
@@ -162,11 +309,13 @@ const Dashboard: React.FC<DashboardProps> = ({ standings, matches, teams, onMatc
                     <td className="px-4 py-3 text-center text-lime-400 font-bold">{winRate}%</td>
                     <td className="px-4 py-3 text-center text-slate-400">{team.wins}</td>
                     <td className="px-4 py-3 text-center text-slate-400">{team.losses}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`inline-block px-2 rounded ${team.flexUsed >= 8 ? 'bg-red-500/20 text-red-400' : 'bg-slate-700 text-slate-300'}`}>
-                        {team.flexUsed}/10
-                      </span>
-                    </td>
+                    {viewMode === 'overall' && (
+                      <td className="px-4 py-3 text-center">
+                        <span className={`inline-block px-2 rounded ${team.flexUsed >= 8 ? 'bg-red-500/20 text-red-400' : 'bg-slate-700 text-slate-300'}`}>
+                          {team.flexUsed}/10
+                        </span>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -176,11 +325,11 @@ const Dashboard: React.FC<DashboardProps> = ({ standings, matches, teams, onMatc
       </Card>
 
       {/* Team Stats — Spotlights + Analytics */}
-      <TeamStats matches={matches} teams={teams} />
+      <TeamStats matches={displayMatches} teams={teams} />
 
       {/* Player Standings */}
       <PlayerStandings
-        matches={matches}
+        matches={displayMatches}
         teams={teams}
         limit={5}
         showViewAll={true}

@@ -1,19 +1,26 @@
 import { useState, useMemo } from 'react';
 import { Sparkles } from 'lucide-react';
+import { User } from 'firebase/auth';
 import { usePlayers, useTimeSlots } from '../providers';
 import { INITIAL_TEAMS } from './timeslotHelpers';
-import { Match, TimeSlot } from '../../types';
+import { Match, TimeSlot, Team, ReportModalProps } from '../../types';
 
 interface PlayableMatchesSectionProps {
   playableMatches: Match[];
   timeSlot: TimeSlot;
   totalRsvps: number;
+  teams: Team[];
+  user: User | null;
+  playerName: string | null;
+  updateMatch: (matchId: number, data: Partial<Match>) => void;
+  ReportModal: React.ComponentType<ReportModalProps>;
 }
 
-export const PlayableMatchesSection = ({ playableMatches, timeSlot, totalRsvps }: PlayableMatchesSectionProps) => {
+export const PlayableMatchesSection = ({ playableMatches, timeSlot, totalRsvps, teams, user, playerName, updateMatch, ReportModal }: PlayableMatchesSectionProps) => {
   const { linkMatchToTimeSlot } = useTimeSlots();
   const { getPlayerName } = usePlayers();
   const [linking, setLinking] = useState<Record<number, boolean>>({});
+  const [editingMatch, setEditingMatch] = useState<Match | null>(null);
 
   const handleLinkMatch = async (matchId: number, shouldLink: boolean) => {
     setLinking({ ...linking, [matchId]: true });
@@ -40,7 +47,22 @@ export const PlayableMatchesSection = ({ playableMatches, timeSlot, totalRsvps }
   const linkedCount = timeSlot.linkedMatches?.length || 0;
 
   return (
-    <div className={`${playableMatches.length > 0 ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-900/50 border-white/10'} border rounded-xl p-4`}>
+    <>
+      {editingMatch && (
+        <ReportModal
+          match={editingMatch}
+          teams={teams}
+          user={user}
+          playerName={playerName}
+          onClose={() => setEditingMatch(null)}
+          onSave={(id, data) => {
+            updateMatch(id, data);
+            setEditingMatch(null);
+          }}
+        />
+      )}
+
+      <div className={`${playableMatches.length > 0 ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-900/50 border-white/10'} border rounded-xl p-4`}>
       <div className="flex items-center gap-2 mb-3">
         <Sparkles className={playableMatches.length > 0 ? 'text-green-400' : 'text-slate-500'} size={18} />
         <span className={`font-bold ${playableMatches.length > 0 ? 'text-green-300' : 'text-slate-400'}`}>
@@ -78,12 +100,15 @@ export const PlayableMatchesSection = ({ playableMatches, timeSlot, totalRsvps }
             return (
               <div
                 key={match.id}
-                className={`bg-slate-900/50 rounded-lg p-3 flex items-center justify-between gap-3 ${
+                className={`bg-slate-900/50 rounded-lg p-3 flex items-center justify-between gap-3 hover:bg-slate-800/50 transition-colors group ${
                   isLinked ? 'ring-1 ring-lime-500/30' : ''
                 }`}
               >
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-white flex items-center gap-2">
+                <div
+                  className="flex-1 cursor-pointer"
+                  onClick={() => setEditingMatch(match)}
+                >
+                  <div className="text-sm font-medium text-white flex items-center gap-2 group-hover:text-lime-400 transition-colors">
                     Match #{match.id}
                     {isLinked && (
                       <span className="text-[10px] text-lime-400">📌</span>
@@ -126,22 +151,37 @@ export const PlayableMatchesSection = ({ playableMatches, timeSlot, totalRsvps }
                     {getPlayerName(match.pB1)} & {getPlayerName(match.pB2)}
                   </div>
                 </div>
-                <button
-                  onClick={() => handleLinkMatch(match.id, !isLinked)}
-                  disabled={linking[match.id]}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                    isLinked
-                      ? 'bg-lime-500/20 text-lime-400 hover:bg-lime-500/30'
-                      : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
-                  }`}
-                >
-                  {linking[match.id] ? '...' : isLinked ? 'Linked' : 'Link'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingMatch(match);
+                    }}
+                    className="px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 border border-blue-500/30"
+                  >
+                    Report
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleLinkMatch(match.id, !isLinked);
+                    }}
+                    disabled={linking[match.id]}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                      isLinked
+                        ? 'bg-lime-500/20 text-lime-400 hover:bg-lime-500/30'
+                        : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    {linking[match.id] ? '...' : isLinked ? 'Linked' : 'Link'}
+                  </button>
+                </div>
               </div>
             );
           })}
         </div>
       )}
     </div>
+    </>
   );
 };

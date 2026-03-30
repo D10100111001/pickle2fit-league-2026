@@ -1,16 +1,22 @@
 import { useState } from 'react';
 import { CalendarClock, Filter } from 'lucide-react';
+import { User } from 'firebase/auth';
 import { usePlayers, useTimeSlots } from '../providers';
 import { Card } from '../common';
 import { TimeSlotCard } from './TimeSlotCard';
 import { TimeSlotProposalModal } from './TimeSlotProposalModal';
-import { Match } from '../../types';
+import { Match, Team, ReportModalProps } from '../../types';
 
 interface TimeSlotSchedulerProps {
   matches: Match[];
+  teams: Team[];
+  user: User | null;
+  playerName: string | null;
+  updateMatch: (matchId: number, data: Partial<Match>) => void;
+  ReportModal: React.ComponentType<ReportModalProps>;
 }
 
-export const TimeSlotScheduler = ({ matches }: TimeSlotSchedulerProps) => {
+export const TimeSlotScheduler = ({ matches, teams, user, playerName, updateMatch, ReportModal }: TimeSlotSchedulerProps) => {
   const { timeSlots, proposeTimeSlot, updateTimeSlot, deleteTimeSlot } = useTimeSlots();
   const { getPlayerName } = usePlayers();
   const [showProposalModal, setShowProposalModal] = useState(false);
@@ -109,6 +115,11 @@ export const TimeSlotScheduler = ({ matches }: TimeSlotSchedulerProps) => {
                 getPlayerName={getPlayerName}
                 updateTimeSlot={updateTimeSlot}
                 deleteTimeSlot={deleteTimeSlot}
+                teams={teams}
+                user={user}
+                playerName={playerName}
+                updateMatch={updateMatch}
+                ReportModal={ReportModal}
               />
             ))}
           </div>

@@ -188,6 +188,11 @@ export interface TeamsListProps {
 
 export interface TimeSlotSchedulerProps {
   matches: Match[];
+  teams: Team[];
+  user: User | null;
+  playerName: string | null;
+  updateMatch: (matchId: number, data: Partial<Match>) => void;
+  ReportModal: React.ComponentType<ReportModalProps>;
 }
 
 export interface RulesPageProps {}

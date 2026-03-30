@@ -471,7 +471,16 @@ export default function App() {
           />
         );
       case "schedule":
-        return <TimeSlotScheduler matches={matches} />;
+        return (
+          <TimeSlotScheduler
+            matches={matches}
+            teams={INITIAL_TEAMS}
+            user={user}
+            playerName={playerName}
+            updateMatch={updateMatch}
+            ReportModal={ReportModal}
+          />
+        );
       case "players":
         return <PlayerStandingsPage matches={matches} teams={INITIAL_TEAMS} />;
       case "teams":

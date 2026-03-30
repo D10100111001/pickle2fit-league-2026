@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Calendar, Edit3, Trash2 } from 'lucide-react';
+import { User } from 'firebase/auth';
 import { useTimeSlots } from '../providers';
 import { Card, Badge } from '../common';
 import { RSVPModal } from '../modals';
@@ -9,7 +10,7 @@ import { RSVPSummary } from './RSVPSummary';
 import { PlayableMatchesSection } from './PlayableMatchesSection';
 import { MissingPlayersSection } from './MissingPlayersSection';
 import { calculatePlayableMatches, calculateMissingPlayerImpact } from './timeslotHelpers';
-import { Match, TimeSlot, PlayerId } from '../../types';
+import { Match, TimeSlot, PlayerId, Team, ReportModalProps } from '../../types';
 
 interface TimeSlotCardProps {
   timeSlot: TimeSlot;
@@ -17,10 +18,15 @@ interface TimeSlotCardProps {
   getPlayerName: (playerId: PlayerId, fallbackToId?: boolean) => string;
   updateTimeSlot: (slotId: string, dateTime: string, location: string, notes: string) => Promise<void>;
   deleteTimeSlot: (slotId: string) => Promise<void>;
+  teams: Team[];
+  user: User | null;
+  playerName: string | null;
+  updateMatch: (matchId: number, data: Partial<Match>) => void;
+  ReportModal: React.ComponentType<ReportModalProps>;
 }
 
-export const TimeSlotCard = ({ timeSlot, matches, getPlayerName, updateTimeSlot, deleteTimeSlot }: TimeSlotCardProps) => {
-  const { getRSVPsForTimeSlot, user } = useTimeSlots();
+export const TimeSlotCard = ({ timeSlot, matches, getPlayerName, updateTimeSlot, deleteTimeSlot, teams, user, playerName, updateMatch, ReportModal }: TimeSlotCardProps) => {
+  const { getRSVPsForTimeSlot } = useTimeSlots();
   const [showRSVPModal, setShowRSVPModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -132,6 +138,11 @@ export const TimeSlotCard = ({ timeSlot, matches, getPlayerName, updateTimeSlot,
             playableMatches={playableMatches}
             timeSlot={timeSlot}
             totalRsvps={comingRsvps.length}
+            teams={teams}
+            user={user}
+            playerName={playerName}
+            updateMatch={updateMatch}
+            ReportModal={ReportModal}
           />
 
           {/* Missing Players */}
